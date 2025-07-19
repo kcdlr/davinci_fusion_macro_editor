@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DaVinci Resolve Macro Editor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>DaVinci Resolve Macro Editor 📋</h1>
+        <div class="button-group">
+            <input type="file" id="file-input" accept=".setting" style="display: none;">
+            <button id="open-btn">Open .setting File</button>
+            <button id="download-btn" disabled>Download Modified File</button>
+        </div>
+        <div class="button-group">
+            <button id="group-btn" disabled>Group Selection</button>
+            <button id="rename-btn" disabled>Rename</button>
+            <button id="page-btn" disabled>Add Page Marker</button>
+            <button id="delete-btn" disabled>Delete</button>
+        </div>
+        <div class="button-group">
+            <button id="move-up-btn" disabled title="Move Up">↑ Move Up</button>
+            <button id="move-down-btn" disabled title="Move Down">↓ Move Down</button>
+            <button id="indent-btn" disabled title="Indent">→ Indent</button>
+            <button id="outdent-btn" disabled title="Outdent">← Outdent</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="controls-container" class="container">
+            <h3>Controls UI Structure</h3>
+            <ul id="controls-list"></ul>
+        </div>
+        <div id="properties-container" class="container">
+            <h3>Properties</h3>
+            <div id="property-editor">
+                <label for="prop-type">Type</label>
+                <input type="text" id="prop-type" disabled>
+                <label for="prop-name">Display Name (LINKS_Name)</label>
+                <input type="text" id="prop-name" disabled>
+            </div>
+            <div id="no-selection">
+                <p>Select an item in the list to get started.</p>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>

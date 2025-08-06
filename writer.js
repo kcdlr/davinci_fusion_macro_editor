@@ -72,7 +72,7 @@ export function generateSettingFile(tree, originalContent, originalFilename, gro
             countDescendants(node);
             userControls.push(`                        ${internalKey} = { LBLC_DropDownButton = true, INPID_InputControl = "LabelControl", LBLC_NumInputs = ${descendantCount}, LBLC_NestLevel = ${getDepth(node) + 1}, LINKID_DataType = "Number", LINKS_Name = "${node.name}", },`);
             userControlInputs.push(`                        ${internalKey} = Input { Value = 1, },`);
-            return `                ${node.data.key || internalKey} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "${internalKey}"\n                }`;
+            return `                ${node.data?.key || internalKey} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "${internalKey}"\n                }`;
         }
         return '';
     }
@@ -124,10 +124,16 @@ ${userControls.join('\n')}
 
     // 3. Assemble the Tools block with explicit, controlled comma placement
     let newToolsBlockContent = newHelperNode;
+
+    // cleanedToolsに中身がある場合のみ処理
     if (cleanedTools.trim()) {
-        // Only add a comma if there are other tools to follow
-        newToolsBlockContent += cleanedTools.trim();
+        // cleanedToolsの先頭から、連続する全ての空白文字とカンマを削除する
+        const perfectlyCleanedTools = cleanedTools.trim().replace(/^[\s,]+/, '');
+
+        // 確実にカンマを1つだけ追加して結合する
+        newToolsBlockContent += ',\n' + perfectlyCleanedTools;
     }
+
     const newToolsBlock = `Tools = ordered() {\n${newToolsBlockContent}\n            }`;
 
     const outputsBlockInfo = findBlockContent(originalContent, "Outputs = {", originalContent.indexOf(groupOperatorName));

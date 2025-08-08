@@ -27,7 +27,7 @@ function findBlockContent(content, blockStartMarker, startIndex = 0) {
     };
 }
 
-export function generateSettingFile(tree, originalContent, originalFilename, groupOperatorName, originalTools) {
+export function generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools) {
     const HELPER_NODE_NAME = "background_helper";
     const userControls = [];
     const userControlInputs = [];
@@ -136,8 +136,8 @@ ${userControls.join('\n')}
 
     const newToolsBlock = `Tools = ordered() {\n${newToolsBlockContent}\n            }`;
 
-    const outputsBlockInfo = findBlockContent(originalContent, "Outputs = {", originalContent.indexOf(groupOperatorName));
-    const viewInfoBlockInfo = findBlockContent(originalContent, "ViewInfo = GroupInfo {", originalContent.indexOf(groupOperatorName));
+    const outputsBlockInfo = findBlockContent(originalContent, "Outputs = {", originalContent.indexOf(mainOperatorName));
+    const viewInfoBlockInfo = findBlockContent(originalContent, "ViewInfo = GroupInfo {", originalContent.indexOf(mainOperatorName));
     if (!outputsBlockInfo || !viewInfoBlockInfo) throw new Error("Could not find 'Outputs' or 'ViewInfo' blocks.");
 
     const outputsBlockString = originalContent.substring(outputsBlockInfo.startIndex, outputsBlockInfo.endIndex);
@@ -153,9 +153,9 @@ ${userControls.join('\n')}
 
     const finalContent = `{
     Tools = ordered() {
-        ${groupOperatorName} = GroupOperator {${newGroupOperatorContent}}
+        ${mainOperatorName} = ${mainOperatorType} {${newGroupOperatorContent}}
     },
-    ActiveTool = "${groupOperatorName}"
+    ActiveTool = "${mainOperatorName}"
 }`;
 
     const safeFilename = String(originalFilename || 'macro.setting');

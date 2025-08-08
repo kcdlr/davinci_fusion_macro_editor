@@ -6,7 +6,8 @@ let tree = { id: 0, type: 'ROOT', children: [], parent: null };
 let nodeMap = new Map();
 let originalContent = '';
 let originalFilename = 'macro.setting';
-let groupOperatorName = 'MyMacro';
+let mainOperatorName = 'MyMacro';
+let mainOperatorType = 'GroupOperator';
 let originalTools = '';
 let selectedIds = new Set();
 let lastSelectedId = null;
@@ -163,7 +164,8 @@ ui.fileInput.addEventListener('change', (e) => {
         // The parser now returns a complete tree, which we use as our state
         const result = parseSettingFile(originalContent);
         tree = result.tree;
-        groupOperatorName = result.groupOperatorName;
+        mainOperatorName = result.mainOperatorName;
+        mainOperatorType = result.mainOperatorType;
         originalTools = result.originalTools;
         selectedIds.clear();
         lastSelectedId = null;
@@ -345,7 +347,7 @@ ui.outdentBtn.addEventListener('click', () => {
 
 ui.downloadBtn.addEventListener('click', () => {
     try {
-        const { content, filename } = generateSettingFile(tree, originalContent, originalFilename, groupOperatorName, originalTools);
+        const { content, filename } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools);
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);

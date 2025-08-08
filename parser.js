@@ -43,8 +43,11 @@ export function parseSettingFile(content) {
     let nextId = 0;
     const root = { id: nextId++, type: 'ROOT', children: [], parent: null };
 
-    const groupOperatorMatch = content.match(/(\w+)\s*=\s*GroupOperator\s*{/);
-    const groupOperatorName = groupOperatorMatch ? groupOperatorMatch[1] : 'MyMacro';
+    // Match either “GroupOperator” or “MacroOperator” so the parser works for both types
+    // Capture both the operator name and its type (GroupOperator or MacroOperator)
+    const groupOperatorMatch = content.match(/(\w+)\s*=\s*(GroupOperator|MacroOperator)\s*{/);
+    const mainOperatorName = groupOperatorMatch ? groupOperatorMatch[1] : 'MyMacro';
+    const mainOperatorType = groupOperatorMatch ? groupOperatorMatch[2] : 'GroupOperator';
     const groupOperatorStartIndex = groupOperatorMatch ? groupOperatorMatch.index : 0;
 
     // --- Pass 1: Create a flat list of all InstanceInputs and Page Comments ---
@@ -153,5 +156,5 @@ export function parseSettingFile(content) {
 
     buildTreeRecursive(root, flatList);
 
-    return { tree: root, groupOperatorName, originalTools };
+    return { tree: root, mainOperatorName, mainOperatorType, originalTools };
 }

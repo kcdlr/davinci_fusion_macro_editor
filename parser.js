@@ -34,6 +34,39 @@ function findBlockContent(content, blockStartMarker, startIndex = 0) {
     };
 }
 
+function findTopLevelBlock(body, header) {
+    if (!body) return null;
+    let depth = 0;
+    for (let i = 0; i < body.length; i++) {
+        const ch = body[i];
+        if (ch === '{') depth++;
+        else if (ch === '}') depth = Math.max(0, depth - 1);
+
+        if (depth === 0 && body.startsWith(header, i)) {
+            const bracePos = body.indexOf('{', i + header.length - 1);
+            if (bracePos === -1) return null;
+            let d = 1;
+            let j = bracePos + 1;
+            while (j < body.length && d > 0) {
+                const cj = body[j];
+                if (cj === '{') d++;
+                else if (cj === '}') d--;
+                j++;
+            }
+            if (d === 0) {
+                return {
+                    content: body.substring(bracePos + 1, j - 1),
+                    startIndex: i,
+                    endIndex: j
+                };
+            } else {
+                return null;
+            }
+        }
+    }
+    return null;
+}
+
 /**
  * Parses the .setting file using a robust, multi-pass approach.
  * @param {string} content The string content of the .setting file.
@@ -49,10 +82,13 @@ export function parseSettingFile(content) {
     const mainOperatorName = groupOperatorMatch ? groupOperatorMatch[1] : 'MyMacro';
     const mainOperatorType = groupOperatorMatch ? groupOperatorMatch[2] : 'GroupOperator';
     const groupOperatorStartIndex = groupOperatorMatch ? groupOperatorMatch.index : 0;
+    const groupOpenHeader = `${mainOperatorName} = ${mainOperatorType} {`;
+    const groupBlock = findBlockContent(content, groupOpenHeader, groupOperatorStartIndex);
+    const groupBody = groupBlock ? groupBlock.content : content.substring(groupOperatorStartIndex);
 
     // --- Pass 1: Create a flat list of all InstanceInputs and Page Comments ---
     const flatList = [];
-    const inputsBlock = findBlockContent(content, "Inputs = ordered() {", groupOperatorStartIndex);
+    const inputsBlock = findTopLevelBlock(groupBody, "Inputs = ordered() {");
 
     if (inputsBlock) {
         const lineRegex = /^\s*(-- ▼▼▼ ページ:.*|([a-zA-Z0-9_]+)\s*=\s*InstanceInput\s*{)/gm;
@@ -83,7 +119,7 @@ export function parseSettingFile(content) {
 
     // --- Pass 2: Read the helper node metadata, including LBLC_NumInputs ---
     const metadataMap = new Map();
-    const toolsBlock = findBlockContent(content, "Tools = ordered() {", groupOperatorStartIndex);
+    const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
     const originalTools = toolsBlock ? toolsBlock.content : '';
     const helperBlock = findBlockContent(originalTools, "background_helper = Background {");
 

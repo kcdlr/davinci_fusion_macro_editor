@@ -68,6 +68,21 @@ function findFirstTopLevelBlock(body, headers) {
     return null;
 }
 
+function indentLines(text, indent = "                ") {
+    return text
+        .split("\n")
+        .map(line => indent + line)
+        .join("\n");
+}
+
+function indentFirstLine(text, indent = "                ") {
+    const nl = text.indexOf("\n");
+    if (nl === -1) return indent + text;
+    const first = text.slice(0, nl);
+    const rest = text.slice(nl + 1);
+    return indent + first + "\n" + rest;
+}
+
 export function generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools) {
     const HELPER_NODE_NAME = "background_helper";
     const userControls = [];
@@ -143,7 +158,8 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
     }
 
     const sanitizedMainInputs = mainInputs.map(block => block.trim().replace(/,$/, "").trim());
-    const newInputsBlock = `Inputs = ordered() {\n${sanitizedMainInputs.join(',\n')}\n            }`;
+    const indentedMainInputs = sanitizedMainInputs.map(b => indentFirstLine(b, "                "));
+    const newInputsBlock = `Inputs = ordered() {\n${indentedMainInputs.join(',\n')}\n            }`;
 
     const newHelperNode = `                ${HELPER_NODE_NAME} = Background {
                     Inputs = {
@@ -168,11 +184,12 @@ ${userControls.join('\n')}
 
     // cleanedToolsに中身がある場合のみ処理
     if (cleanedTools.trim()) {
-        // cleanedToolsの先頭から、連続する全ての空白文字とカンマを削除する
-        const perfectlyCleanedTools = cleanedTools.trim().replace(/^[\s,]+/, '');
-
+        // 先頭の空白・カンマだけを除去（内部の既存インデントは保持）
+        const cleanedHead = cleanedTools.replace(/^[\s,]*/, '');
+        // 次行の先頭（最初の行）だけ Tools レベルのインデントを付与
+        const indentedHeadOnce = indentFirstLine(cleanedHead, "                ");
         // 確実にカンマを1つだけ追加して結合する
-        newToolsBlockContent += ',\n' + perfectlyCleanedTools;
+        newToolsBlockContent += ',\n' + indentedHeadOnce;
     }
 
     const newToolsBlock = `Tools = ordered() {\n${newToolsBlockContent}\n            }`;

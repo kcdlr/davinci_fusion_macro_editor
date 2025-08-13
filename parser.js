@@ -177,12 +177,14 @@ export function parseSettingFile(content) {
                     buildTreeRecursive(groupNode, childrenToProcess);
 
                 } else { // It's a standard control
+                    const isMainInput = /^MainInput\d+$/i.test(item.key);
                     const controlNode = {
                         id: nextId++,
                         type: 'CONTROL',
                         data: { key: item.key, originalBlock: item.originalBlock, properties: item.properties },
                         parent: parent,
-                        children: []
+                        children: [],
+                        hidden: isMainInput
                     };
                     parent.children.push(controlNode);
                 }

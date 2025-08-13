@@ -41,7 +41,7 @@ function buildNodeMap(node) {
 function getFlatListForRender() {
     function flatten(node, depth = 0) {
         let list = [];
-        if (node.type !== 'ROOT') { list.push({ ...node, depth }); }
+        if (node.type !== 'ROOT' && !node.hidden) { list.push({ ...node, depth }); }
         const childrenDepth = (node.type === 'GROUP') ? depth + 1 : depth;
         if (node.children) { node.children.forEach(child => { list = list.concat(flatten(child, childrenDepth)); }); }
         return list;
@@ -101,7 +101,8 @@ const updateButtonStates = () => {
     const firstNode = nodeMap.get(Array.from(selectedIds)[0]);
     if(!firstNode) return;
 
-    ui.renameBtn.disabled = !(isSingleSelection && (firstNode.type === 'GROUP' || firstNode.type === 'PAGE'));
+    const canRename = isSingleSelection && ((firstNode.type === 'GROUP' || firstNode.type === 'PAGE') || (firstNode.type === 'CONTROL' && !firstNode.hidden));
+    ui.renameBtn.disabled = !canRename;
 
     if (!isSingleSelection) {
         ui.moveUpBtn.disabled = true;
@@ -192,7 +193,7 @@ ui.controlsList.addEventListener('click', (e) => {
 
             selectedIds.clear();
             for (let i = start; i <= end; i++) {
-                if (siblings[i].type === 'CONTROL') {
+                if (siblings[i].type === 'CONTROL' && !siblings[i].hidden) {
                     selectedIds.add(siblings[i].id);
                 }
             }
@@ -232,11 +233,32 @@ ui.renameBtn.addEventListener('click', () => {
     if (selectedIds.size !== 1) return;
     const nodeId = selectedIds.values().next().value;
     const node = nodeMap.get(nodeId);
-    if (!node || (node.type !== 'GROUP' && node.type !== 'PAGE')) return;
-    const newName = prompt(`Enter new name for "${node.name}":`, node.name);
-    if (newName && newName.trim() !== '') {
-        node.name = newName.trim();
-        render();
+    if (!node) return;
+
+    if (node.type === 'GROUP' || node.type === 'PAGE') {
+        const newName = prompt(`Enter new name for "${node.name}":`, node.name);
+        if (newName && newName.trim() !== '') {
+            node.name = newName.trim();
+            render();
+        }
+        return;
+    }
+
+    if (node.type === 'CONTROL' && !node.hidden) {
+        const currentName = (
+            node.data && node.data.properties &&
+            (node.data.properties.Name || node.data.properties.LINKS_Name || node.data.properties.Source)
+        ) || node.data.key || '';
+
+        const newName = prompt(`Enter new name for "${currentName}":`, currentName);
+        if (newName && newName.trim() !== '') {
+            if (!node.data) node.data = {};
+            if (!node.data.properties) node.data.properties = {};
+            node.data.properties.Name = newName.trim();
+            node.data.__renamed = true;
+            render();
+        }
+        return;
     }
 });
 

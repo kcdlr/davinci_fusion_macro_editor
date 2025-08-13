@@ -83,6 +83,35 @@ function indentFirstLine(text, indent = "                ") {
     return indent + first + "\n" + rest;
 }
 
+function updateInstanceInputName(block, newName) {
+    try {
+        const escaped = String(newName).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+        // Try to replace existing Name property (keep existing indentation and trailing comma)
+        const namePropRegex = /(\n[ \t]*Name\s*=\s*)("([^"]*)"|[^,}\n]+)(\s*,?)/;
+        if (namePropRegex.test(block)) {
+            return block.replace(namePropRegex, `$1"${escaped}",`);
+        }
+
+        // Otherwise insert Name as the first property after the opening brace
+        const braceIdx = block.indexOf('{');
+        if (braceIdx === -1) return block;
+
+        const newlineIdx = block.indexOf('\n', braceIdx);
+        const insertPos = newlineIdx === -1 ? braceIdx + 1 : newlineIdx + 1;
+
+        const after = block.slice(insertPos);
+        // Try to infer indentation from the next line; fallback to 20 spaces if not found
+        const indentMatch = after.match(/^([ \t]+)/);
+        const indent = indentMatch ? indentMatch[1] : '                    ';
+
+        const insertion = `${indent}Name = "${escaped}",\n`;
+        return block.slice(0, insertPos) + insertion + block.slice(insertPos);
+    } catch {
+        return block;
+    }
+}
+
 export function generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools) {
     const HELPER_NODE_NAME = "background_helper";
     const userControls = [];
@@ -111,7 +140,15 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
 
     function generateBaseBlock(node) {
         if (node.type === 'CONTROL') {
-            return node.data.originalBlock;
+            let block = node.data.originalBlock;
+            // If this control was renamed via UI, reflect it into the InstanceInput block as Name
+            if (node.data && node.data.__renamed) {
+                const newName = node.data.properties ? node.data.properties.Name : null;
+                if (newName && typeof newName === 'string') {
+                    block = updateInstanceInputName(block, newName);
+                }
+            }
+            return block;
         }
         else if (node.type === 'GROUP') {
             if (!node.internalKey) {

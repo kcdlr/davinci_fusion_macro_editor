@@ -27,6 +27,47 @@ function findBlockContent(content, blockStartMarker, startIndex = 0) {
     };
 }
 
+function findTopLevelBlock(body, header) {
+    if (!body) return null;
+    let depth = 0;
+    for (let i = 0; i < body.length; i++) {
+        const ch = body[i];
+        if (ch === '{') depth++;
+        else if (ch === '}') depth = Math.max(0, depth - 1);
+
+        if (depth === 0 && body.startsWith(header, i)) {
+            const bracePos = body.indexOf('{', i + header.length - 1);
+            if (bracePos === -1) return null;
+            let d = 1;
+            let j = bracePos + 1;
+            while (j < body.length && d > 0) {
+                const cj = body[j];
+                if (cj === '{') d++;
+                else if (cj === '}') d--;
+                j++;
+            }
+            if (d === 0) {
+                return {
+                    content: body.substring(bracePos + 1, j - 1),
+                    startIndex: i,
+                    endIndex: j
+                };
+            } else {
+                return null;
+            }
+        }
+    }
+    return null;
+}
+
+function findFirstTopLevelBlock(body, headers) {
+    for (const h of headers) {
+        const blk = findTopLevelBlock(body, h);
+        if (blk) return blk;
+    }
+    return null;
+}
+
 export function generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools) {
     const HELPER_NODE_NAME = "background_helper";
     const userControls = [];
@@ -136,12 +177,18 @@ ${userControls.join('\n')}
 
     const newToolsBlock = `Tools = ordered() {\n${newToolsBlockContent}\n            }`;
 
-    const outputsBlockInfo = findBlockContent(originalContent, "Outputs = {", originalContent.indexOf(mainOperatorName));
-    const viewInfoBlockInfo = findBlockContent(originalContent, "ViewInfo = GroupInfo {", originalContent.indexOf(mainOperatorName));
-    if (!outputsBlockInfo || !viewInfoBlockInfo) throw new Error("Could not find 'Outputs' or 'ViewInfo' blocks.");
+    const mainHeader = `${mainOperatorName} = ${mainOperatorType} {`;
+    const mainHeaderIndex = originalContent.indexOf(mainHeader);
+    const groupBlockInfo = findBlockContent(originalContent, mainHeader, Math.max(0, mainHeaderIndex));
+    const groupBody = groupBlockInfo ? groupBlockInfo.content : originalContent;
 
-    const outputsBlockString = originalContent.substring(outputsBlockInfo.startIndex, outputsBlockInfo.endIndex);
-    const viewInfoBlockString = originalContent.substring(viewInfoBlockInfo.startIndex, viewInfoBlockInfo.endIndex);
+    const outputsBlockInfo = findFirstTopLevelBlock(groupBody, ["Outputs = ordered() {", "Outputs = {"]);
+    const viewInfoBlockInfo = findFirstTopLevelBlock(groupBody, ["ViewInfo = GroupInfo {", "ViewInfo = OperatorInfo {"]);
+
+    if (!outputsBlockInfo || !viewInfoBlockInfo) throw new Error("Could not find 'Outputs' or 'ViewInfo' blocks within the main operator.");
+
+    const outputsBlockString = groupBody.substring(outputsBlockInfo.startIndex, outputsBlockInfo.endIndex);
+    const viewInfoBlockString = groupBody.substring(viewInfoBlockInfo.startIndex, viewInfoBlockInfo.endIndex);
 
     const groupOperatorParts = [
         newInputsBlock.trim(),

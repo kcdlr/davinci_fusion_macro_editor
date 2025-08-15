@@ -112,12 +112,25 @@ function updateInstanceInputName(block, newName) {
     }
 }
 
-export function generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools) {
+export function generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex = 0) {
     const HELPER_NODE_NAME = "background_helper";
     const userControls = [];
     const userControlInputs = [];
     const mainInputs = [];
-    let autoLabelCounter = 1;
+    // Determine the highest existing AutoLabel index from both the parsed file and the current in-memory tree
+    let maxFromTree = 0;
+    (function scan(node) {
+        if (node && node.type === 'GROUP' && node.internalKey) {
+            const m = String(node.internalKey).match(/^AutoLabel(\d+)$/);
+            if (m) {
+                const n = parseInt(m[1], 10);
+                if (!isNaN(n)) maxFromTree = Math.max(maxFromTree, n);
+            }
+        }
+        if (node && node.children) node.children.forEach(scan);
+    })(tree);
+    const effectiveMax = Math.max(maxAutoLabelIndex || 0, maxFromTree || 0);
+    let autoLabelCounter = effectiveMax + 1;
 
     function getDepth(node) {
         let depth = 0;

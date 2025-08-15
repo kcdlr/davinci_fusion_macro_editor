@@ -118,8 +118,9 @@ export function parseSettingFile(content) {
     }
 
     // --- Pass 2: Read the helper node metadata, including LBLC_NumInputs ---
-    const metadataMap = new Map();
-    const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
+const metadataMap = new Map();
+let maxAutoLabelIndex = 0;
+const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
     const originalTools = toolsBlock ? toolsBlock.content : '';
     const helperBlock = findBlockContent(originalTools, "background_helper = Background {");
 
@@ -130,6 +131,11 @@ export function parseSettingFile(content) {
             let controlMatch;
             while((controlMatch = controlRegex.exec(userControlsBlock.content)) !== null) {
                 const key = controlMatch[1];
+                const numCap = key.match(/AutoLabel(\d+)/);
+                if (numCap) {
+                    const n = parseInt(numCap[1], 10);
+                    if (!isNaN(n)) maxAutoLabelIndex = Math.max(maxAutoLabelIndex, n);
+                }
                 const propertiesText = controlMatch[2];
                 const nameMatch = propertiesText.match(/LINKS_Name\s*=\s*"([^"]+)"/);
                 const nestLevelMatch = propertiesText.match(/LBLC_NestLevel\s*=\s*(\d+)/);
@@ -194,5 +200,5 @@ export function parseSettingFile(content) {
 
     buildTreeRecursive(root, flatList);
 
-    return { tree: root, mainOperatorName, mainOperatorType, originalTools };
+    return { tree: root, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex };
 }

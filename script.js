@@ -9,6 +9,7 @@ let originalFilename = 'macro.setting';
 let mainOperatorName = 'MyMacro';
 let mainOperatorType = 'GroupOperator';
 let originalTools = '';
+let maxAutoLabelIndex = 0;
 let selectedIds = new Set();
 let lastSelectedId = null;
 
@@ -168,6 +169,7 @@ ui.fileInput.addEventListener('change', (e) => {
         mainOperatorName = result.mainOperatorName;
         mainOperatorType = result.mainOperatorType;
         originalTools = result.originalTools;
+        maxAutoLabelIndex = result.maxAutoLabelIndex || 0;
         selectedIds.clear();
         lastSelectedId = null;
         render();
@@ -369,7 +371,7 @@ ui.outdentBtn.addEventListener('click', () => {
 
 ui.downloadBtn.addEventListener('click', () => {
     try {
-        const { content, filename } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools);
+        const { content, filename } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex);
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);

@@ -212,6 +212,7 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
     const newInputsBlock = `Inputs = ordered() {\n${indentedMainInputs.join(',\n')}\n            }`;
 
     const newHelperNode = `                ${HELPER_NODE_NAME} = Background {
+                    PassThrough = true,
                     Inputs = {
                         Width = Input { Value = 1920, },
                         Height = Input { Value = 1080, },

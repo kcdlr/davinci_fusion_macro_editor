@@ -144,8 +144,9 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
 
     function addPageProperty(textBlock, pageName) {
         if (!pageName) return textBlock;
-        if (textBlock.includes('Page = ')) {
-            return textBlock.replace(/Page\s*=\s*"[^"]*"/, `Page = "${pageName}"`);
+        // 引用符で囲まれた値と囲まれていない値の両方に一致するように正規表現を更新
+        if (textBlock.match(/Page\s*=\s*(?:"[^"]*"|[^,}\s]+)/)) {
+            return textBlock.replace(/Page\s*=\s*(?:"[^"]*"|[^,}\s]+)/, `Page = "${pageName}"`);
         } else {
             return textBlock.replace(/(\s*{)/, `$1\n                    Page = "${pageName}",`);
         }
@@ -190,19 +191,18 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
         return list;
     })(tree);
 
+    let currentPageName = null; // ページ名を追跡する変数を追加
+
     for (let i = 0; i < flatList.length; i++) {
         const item = flatList[i];
         if (item.type === 'PAGE') {
-            mainInputs.push(`\n                -- ▼▼▼ ページ: ${item.name} ▼▼▼`);
-            const nextItem = flatList[i + 1];
-            if (nextItem && (nextItem.type === 'CONTROL' || nextItem.type === 'GROUP')) {
-                const baseBlock = generateBaseBlock(nextItem);
-                const finalBlock = addPageProperty(baseBlock, item.name);
-                mainInputs.push(finalBlock);
-                i++;
-            }
+            // ページマーカーコメントは不要なので削除
+            currentPageName = item.name; // ページマーカーが見つかったらページ名を更新
         } else {
-            const baseBlock = generateBaseBlock(item);
+            let baseBlock = generateBaseBlock(item);
+            if (currentPageName) { // currentPageNameが設定されていればPageプロパティを追加
+                baseBlock = addPageProperty(baseBlock, currentPageName);
+            }
             mainInputs.push(baseBlock);
         }
     }

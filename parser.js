@@ -91,29 +91,62 @@ export function parseSettingFile(content) {
     const inputsBlock = findTopLevelBlock(groupBody, "Inputs = ordered() {");
 
     if (inputsBlock) {
-        const lineRegex = /^\s*(-- ▼▼▼ ページ:.*|([a-zA-Z0-9_]+)\s*=\s*InstanceInput\s*{)/gm;
-        let lineMatch;
-        while ((lineMatch = lineRegex.exec(inputsBlock.content)) !== null) {
-            if (lineMatch[1].startsWith('--')) {
-                const pageNameMatch = lineMatch[1].match(/-- ▼▼▼ ページ:\s*(.+)\s*▼▼▼/);
-                if (pageNameMatch) {
-                    flatList.push({ type: 'PAGE_MARKER', name: pageNameMatch[1].trim() });
-                }
-            } else {
-                const key = lineMatch[2];
-                const blockStart = lineMatch.index + lineMatch[0].length - 1;
-                const controlContent = findBlockContent(inputsBlock.content, "{", blockStart);
-                if (!controlContent) continue;
+        let currentPageName = "Controls"; // デフォルトは"Controls"
 
-                const fullOriginalBlock = inputsBlock.content.substring(lineMatch.index, controlContent.endIndex).trim();
-                const properties = {};
-                const propsRegex = /(\w+)\s*=\s*(?:"([^"]*)"|({[^}]*})|([^,}\s]+))/g;
-                let propMatch;
-                while((propMatch = propsRegex.exec(controlContent.content)) !== null){
-                    properties[propMatch[1]] = propMatch[2] || propMatch[3] || propMatch[4];
-                }
-                flatList.push({ type: 'CONTROL_DATA', key, properties, originalBlock: fullOriginalBlock });
+        // Regex to find InstanceInput blocks
+        const instanceInputRegex = /([a-zA-Z0-9_]+)\s*=\s*InstanceInput\s*{/g;
+        let inputMatch;
+
+        // まず、すべてのコントロールデータを収集
+        const allControlData = [];
+        while ((inputMatch = instanceInputRegex.exec(inputsBlock.content)) !== null) {
+            const key = inputMatch[1];
+            const blockStart = inputMatch.index + inputMatch[0].length - 1;
+            const controlContent = findBlockContent(inputsBlock.content, "{", blockStart);
+            if (!controlContent) continue;
+
+            const fullOriginalBlock = inputsBlock.content.substring(inputMatch.index, controlContent.endIndex).trim();
+            const properties = {};
+            const propsRegex = /(\w+)\s*=\s*(?:"([^"]*)"|({[^}]*})|([^,}\s]+))/g;
+            let propMatch;
+            while((propMatch = propsRegex.exec(controlContent.content)) !== null){
+                properties[propMatch[1]] = propMatch[2] || propMatch[3] || propMatch[4];
             }
+            allControlData.push({ type: 'CONTROL_DATA', key, properties, originalBlock: fullOriginalBlock });
+        }
+
+        // 収集したコントロールデータに基づいてPAGE_MARKERを挿入
+        let firstControl = true;
+        for (const item of allControlData) {
+            const pageProperty = item.properties.Page; // 'Page'プロパティをチェック
+
+            if (firstControl) {
+                // 最初のコントロールの処理
+                if (pageProperty && pageProperty !== "Controls") {
+                    currentPageName = pageProperty;
+                    flatList.push({ type: 'PAGE_MARKER', name: currentPageName });
+                } else {
+                    // Pageプロパティがないか"Controls"の場合は、currentPageNameは"Controls"のまま
+                    // マーカーは挿入しない
+                }
+                firstControl = false;
+            } else {
+                // 後続のコントロールの処理
+                if (pageProperty && pageProperty !== currentPageName) {
+                    // 新しいPageプロパティがあり、現在のページ名と異なる場合
+                    flatList.push({ type: 'PAGE_MARKER', name: pageProperty });
+                    currentPageName = pageProperty;
+                }
+                // Pageプロパティがない場合、または現在のページ名と同じ場合は、ページマーカーを挿入しない
+                // currentPageNameも変更しない（一度設定されたページは明示的に変更されるまで維持される）
+            }
+
+            // Pageプロパティを削除
+            if (item.properties.Page) {
+                delete item.properties.Page;
+            }
+
+            flatList.push(item); // コントロールデータ自体を追加
         }
     }
 

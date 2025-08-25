@@ -37,6 +37,13 @@ const ui = {
     downloadOutputBtn: document.getElementById('download-output-btn'),
 };
 
+function addClickFeedback(button) {
+    button.classList.add('clicked');
+    setTimeout(() => {
+        button.classList.remove('clicked');
+    }, 200); // Remove the class after 200ms
+}
+
 function processInputContent(content, filename = 'clipboard_macro.setting') {
     try {
         originalContent = content;
@@ -178,7 +185,10 @@ const updatePropertyEditor = () => {
 };
 
 // --- EVENT HANDLERS ---
-ui.openBtn.addEventListener('click', () => ui.fileInput.click());
+ui.openBtn.addEventListener('click', () => {
+    addClickFeedback(ui.openBtn);
+    ui.fileInput.click();
+});
 
 ui.fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -193,6 +203,7 @@ ui.fileInput.addEventListener('change', (e) => {
 });
 
 ui.pasteBtn.addEventListener('click', async () => {
+    addClickFeedback(ui.pasteBtn);
     try {
         const text = await navigator.clipboard.readText();
         if (text) {
@@ -237,6 +248,7 @@ ui.controlsList.addEventListener('click', (e) => {
 });
 
 ui.groupBtn.addEventListener('click', () => {
+    addClickFeedback(ui.groupBtn);
     if (selectedIds.size === 0) return;
     const name = prompt("Enter group name:", "New Group");
     if (!name) return;
@@ -260,6 +272,7 @@ ui.groupBtn.addEventListener('click', () => {
 });
 
 ui.renameBtn.addEventListener('click', () => {
+    addClickFeedback(ui.renameBtn);
     if (selectedIds.size !== 1) return;
     const nodeId = selectedIds.values().next().value;
     const node = nodeMap.get(nodeId);
@@ -293,6 +306,7 @@ ui.renameBtn.addEventListener('click', () => {
 });
 
 ui.pageBtn.addEventListener('click', () => {
+    addClickFeedback(ui.pageBtn);
     if (selectedIds.size !== 1) return;
     const name = prompt("Enter page name:", "New Page");
     if (!name) return;
@@ -313,6 +327,7 @@ ui.pageBtn.addEventListener('click', () => {
 });
 
 ui.deleteBtn.addEventListener('click', () => {
+    addClickFeedback(ui.deleteBtn);
     if (selectedIds.size === 0) return;
 
     const nodesToDelete = Array.from(selectedIds).map(id => nodeMap.get(id));
@@ -333,6 +348,7 @@ ui.deleteBtn.addEventListener('click', () => {
 });
 
 ui.moveUpBtn.addEventListener('click', () => {
+    addClickFeedback(ui.moveUpBtn);
     if (selectedIds.size !== 1) return;
     const nodeId = selectedIds.values().next().value;
     const node = nodeMap.get(nodeId);
@@ -347,6 +363,7 @@ ui.moveUpBtn.addEventListener('click', () => {
 });
 
 ui.moveDownBtn.addEventListener('click', () => {
+    addClickFeedback(ui.moveDownBtn);
     if (selectedIds.size !== 1) return;
     const nodeId = selectedIds.values().next().value;
     const node = nodeMap.get(nodeId);
@@ -361,6 +378,7 @@ ui.moveDownBtn.addEventListener('click', () => {
 });
 
 ui.indentBtn.addEventListener('click', () => {
+    addClickFeedback(ui.indentBtn);
     if (selectedIds.size !== 1) return;
     const nodeId = selectedIds.values().next().value;
     const node = nodeMap.get(nodeId);
@@ -381,6 +399,7 @@ ui.indentBtn.addEventListener('click', () => {
 });
 
 ui.outdentBtn.addEventListener('click', () => {
+    addClickFeedback(ui.outdentBtn);
     if (selectedIds.size !== 1) return;
     const nodeId = selectedIds.values().next().value;
     const node = nodeMap.get(nodeId);
@@ -398,6 +417,7 @@ ui.outdentBtn.addEventListener('click', () => {
 });
 
 ui.outputBtn.addEventListener('click', () => {
+    addClickFeedback(ui.outputBtn);
     try {
         const { content } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex);
         ui.outputText.value = content;
@@ -408,6 +428,7 @@ ui.outputBtn.addEventListener('click', () => {
 });
 
 ui.copyOutputBtn.addEventListener('click', () => {
+    addClickFeedback(ui.copyOutputBtn);
     ui.outputText.select();
     navigator.clipboard.writeText(ui.outputText.value)
         .then(() => alert('Output copied to clipboard!'))
@@ -415,6 +436,7 @@ ui.copyOutputBtn.addEventListener('click', () => {
 });
 
 ui.downloadOutputBtn.addEventListener('click', () => {
+    addClickFeedback(ui.downloadOutputBtn);
     try {
         const { content, filename } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex);
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });

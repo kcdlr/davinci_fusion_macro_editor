@@ -163,3 +163,8 @@ button:disabled {
 #output-area .button-group {
     margin-top: 1rem; /* Copy/Downloadボタンの上にマージンを追加 */
 }
+
+.clicked {
+    background-color: #6c757d !important; /* A slightly darker shade for feedback */
+    border-color: #5a6268 !important;
+}

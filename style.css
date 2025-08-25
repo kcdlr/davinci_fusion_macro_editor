@@ -18,18 +18,35 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     margin: 0;
-    padding: 1rem;
-    overflow-y: auto; /* コンテンツが溢れた場合にスクロールバーを表示 */
+    padding: 1rem; /* 全体のパディングを維持 */
+    padding-top: calc(1rem + 150px); /* 固定ヘッダーの高さ分を考慮 */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* ビューポートの高さいっぱいにする */
+    box-sizing: border-box; /* パディングを高さに含める */
 }
 
 header {
-    padding-bottom: 1rem;
+    padding-bottom: 0.5rem; /* 固定ボタン群との間にスペースを調整 */
+}
+
+.fixed-buttons {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background-color: var(--bg-color);
+    padding: 1rem; /* ヘッダーのパディングと合わせる */
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--border-color); /* 区切り線を追加 */
 }
 
 main {
     display: flex;
     gap: 1rem;
-    /* mainの高さがコンテンツによって決まるようにflex-growを削除 */
+    flex-grow: 1; /* 残りのスペースを埋める */
+    overflow-y: auto; /* コンテンツが溢れた場合にスクロールバーを表示 */
 }
 
 h1, h3 {

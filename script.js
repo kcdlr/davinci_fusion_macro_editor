@@ -21,7 +21,8 @@ const ui = {
     renameBtn: document.getElementById('rename-btn'),
     pageBtn: document.getElementById('page-btn'),
     deleteBtn: document.getElementById('delete-btn'),
-    downloadBtn: document.getElementById('download-btn'),
+    pasteBtn: document.getElementById('paste-btn'),
+    outputBtn: document.getElementById('output-btn'),
     moveUpBtn: document.getElementById('move-up-btn'),
     moveDownBtn: document.getElementById('move-down-btn'),
     indentBtn: document.getElementById('indent-btn'),
@@ -30,7 +31,30 @@ const ui = {
     noSelection: document.getElementById('no-selection'),
     propName: document.getElementById('prop-name'),
     propType: document.getElementById('prop-type'),
+    outputArea: document.getElementById('output-area'),
+    outputText: document.getElementById('output-text'),
+    copyOutputBtn: document.getElementById('copy-output-btn'),
+    downloadOutputBtn: document.getElementById('download-output-btn'),
 };
+
+function processInputContent(content, filename = 'clipboard_macro.setting') {
+    try {
+        originalContent = content;
+        originalFilename = filename;
+        const result = parseSettingFile(originalContent);
+        tree = result.tree;
+        mainOperatorName = result.mainOperatorName;
+        mainOperatorType = result.mainOperatorType;
+        originalTools = result.originalTools;
+        maxAutoLabelIndex = result.maxAutoLabelIndex || 0;
+        selectedIds.clear();
+        lastSelectedId = null;
+        render();
+    } catch (error) {
+        alert(`Error processing input: ${error.message}`);
+        console.error('Error during input processing:', error);
+    }
+}
 
 function buildNodeMap(node) {
     nodeMap.set(node.id, node);
@@ -85,7 +109,7 @@ const updateButtonStates = () => {
     const hasSelection = selectionSize > 0;
     const isSingleSelection = selectionSize === 1;
 
-    ui.downloadBtn.disabled = tree.children.length === 0;
+    ui.outputBtn.disabled = tree.children.length === 0;
     ui.groupBtn.disabled = !hasSelection;
     ui.pageBtn.disabled = !isSingleSelection;
     ui.deleteBtn.disabled = !hasSelection;
@@ -162,20 +186,24 @@ ui.fileInput.addEventListener('change', (e) => {
     originalFilename = file.name;
     const reader = new FileReader();
     reader.onload = (ev) => {
-        originalContent = ev.target.result;
-        // The parser now returns a complete tree, which we use as our state
-        const result = parseSettingFile(originalContent);
-        tree = result.tree;
-        mainOperatorName = result.mainOperatorName;
-        mainOperatorType = result.mainOperatorType;
-        originalTools = result.originalTools;
-        maxAutoLabelIndex = result.maxAutoLabelIndex || 0;
-        selectedIds.clear();
-        lastSelectedId = null;
-        render();
+        processInputContent(ev.target.result, originalFilename);
     };
     reader.readAsText(file);
     e.target.value = '';
+});
+
+ui.pasteBtn.addEventListener('click', async () => {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+            processInputContent(text);
+        } else {
+            alert('Clipboard is empty or contains no text.');
+        }
+    } catch (err) {
+        alert('Failed to read from clipboard. Please ensure you have granted clipboard access.');
+        console.error('Failed to read clipboard contents: ', err);
+    }
 });
 
 ui.controlsList.addEventListener('click', (e) => {
@@ -369,7 +397,24 @@ ui.outdentBtn.addEventListener('click', () => {
     render();
 });
 
-ui.downloadBtn.addEventListener('click', () => {
+ui.outputBtn.addEventListener('click', () => {
+    try {
+        const { content } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex);
+        ui.outputText.value = content;
+    } catch (error) {
+        alert(`Error generating output: ${error.message}`);
+        console.error('Error during output generation:', error);
+    }
+});
+
+ui.copyOutputBtn.addEventListener('click', () => {
+    ui.outputText.select();
+    navigator.clipboard.writeText(ui.outputText.value)
+        .then(() => alert('Output copied to clipboard!'))
+        .catch(err => console.error('Failed to copy output: ', err));
+});
+
+ui.downloadOutputBtn.addEventListener('click', () => {
     try {
         const { content, filename } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex);
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -381,7 +426,7 @@ ui.downloadBtn.addEventListener('click', () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
     } catch (error) {
-        alert(`Error generating file: ${error.message}`);
-        console.error('Error during file generation or download:', error);
+        alert(`Error generating file for download: ${error.message}`);
+        console.error('Error during file download:', error);
     }
 });

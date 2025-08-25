@@ -13,7 +13,8 @@
         <div class="button-group">
             <input type="file" id="file-input" accept=".setting" style="display: none;">
             <button id="open-btn">Open .setting File</button>
-            <button id="download-btn" disabled>Download Modified File</button>
+            <button id="paste-btn">Paste from Clipboard</button>
+            <button id="output-btn" disabled>Output</button>
         </div>
         <div class="button-group">
             <button id="group-btn" disabled>Group Selection</button>
@@ -47,6 +48,15 @@
             </div>
         </div>
     </main>
+
+    <div id="output-area" class="container">
+        <h3>Generated Output</h3>
+        <textarea id="output-text" rows="15" cols="80" readonly></textarea>
+        <div class="button-group">
+            <button id="copy-output-btn">Copy</button>
+            <button id="download-output-btn">Download</button>
+        </div>
+    </div>
 
     <script type="module" src="script.js"></script>
 </body>

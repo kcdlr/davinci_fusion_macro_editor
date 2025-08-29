@@ -49,10 +49,17 @@ function processInputContent(content, filename = 'clipboard_macro.setting') {
         originalContent = content;
         originalFilename = filename;
         const result = parseSettingFile(originalContent);
-        // 解析結果が不正な場合にエラーを投げる
-        if (!result || !result.tree) {
-            throw new Error("Macro structure could not be parsed. Check if the file format is correct.");
+
+        // ファイルに中身があるにも関わらず、解析後のツリーが空の場合はエラーとする
+        if (content.trim() !== '' && (!result || !result.tree || result.tree.children.length === 0)) {
+            // ▼▼▼【ここから変更】▼▼▼
+            // エラーを投げる際に、診断ログを添付する
+            const error = new Error("ファイルの解析に失敗しました。対応していない形式か、ファイルが破損している可能性があります。");
+            error.diagnostics = result.diagnostics; // 診断ログをエラーオブジェクトに格納
+            throw error;
+            // ▲▲▲【ここまで変更】▲▲▲
         }
+
         tree = result.tree;
         mainOperatorName = result.mainOperatorName;
         mainOperatorType = result.mainOperatorType;
@@ -62,10 +69,21 @@ function processInputContent(content, filename = 'clipboard_macro.setting') {
         lastSelectedId = null;
         render();
     } catch (error) {
-        // ユーザー向けのアラートをより分かりやすくする
-        alert(`読み込みに失敗しました。\n\n[エラー詳細]\n${error.message}`);
-        // コンソールには詳細なエラーオブジェクトを出力する
-        console.error('Error during input processing:', error);
+        // ユーザー向けアラート
+        alert(`読み込みに失敗しました。\n\n[エラー]\n${error.message}`);
+
+        // 開発者コンソールへの、より良いレポート出力
+        console.error("======= Macro Parsing Failed: Diagnostic Report =======");
+        console.error("Error: ", error.message);
+        if (error.diagnostics) {
+            console.log("--- Analysis Status ---");
+            console.log("Found GroupOperator Block?: ", error.diagnostics.foundGroupOperator);
+            console.log("Extracted 'groupBody' (first 200 chars):\n", error.diagnostics.groupBodySnippet);
+            console.log("Extracted 'inputsBlock' (first 200 chars):\n", error.diagnostics.inputsBlockSnippet);
+            console.log("Extracted 'toolsBlock' (first 200 chars):\n", error.diagnostics.toolsBlockSnippet);
+        }
+        console.error("Full error object: ", error); // 詳細なスタックトレースも残す
+        console.error("=====================================================");
     }
 }
 

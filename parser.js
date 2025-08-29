@@ -76,29 +76,39 @@ export function parseSettingFile(content) {
     let nextId = 0;
     const root = { id: nextId++, type: 'ROOT', children: [], parent: null };
 
-    // Match either “GroupOperator” or “MacroOperator” so the parser works for both types
-    // Capture both the operator name and its type (GroupOperator or MacroOperator)
+    const diagnostics = {
+        foundGroupOperator: "No",
+        groupBodySnippet: "N/A",
+        inputsBlockSnippet: "N/A",
+        toolsBlockSnippet: "N/A"
+    };
+
     const groupOperatorMatch = content.match(/(?:\["([^"]+)"\]|(\w+))\s*=\s*(GroupOperator|MacroOperator)\s*{/);
-    const mainOperatorName = groupOperatorMatch ? (groupOperatorMatch[1] || groupOperatorMatch[2]) : 'MyMacro';
-    const mainOperatorType = groupOperatorMatch ? groupOperatorMatch[3] : 'GroupOperator';
-    const groupOperatorStartIndex = groupOperatorMatch ? groupOperatorMatch.index : 0;
+    if (!groupOperatorMatch) {
+        return { tree: root, mainOperatorName: '', mainOperatorType: '', originalTools: '', maxAutoLabelIndex: 0, diagnostics };
+    }
+    diagnostics.foundGroupOperator = "Yes";
+
+    const mainOperatorName = groupOperatorMatch[1] || groupOperatorMatch[2];
+    const mainOperatorType = groupOperatorMatch[3];
+    const groupOperatorStartIndex = groupOperatorMatch.index;
+
     const formattedMainOperatorName = /^\w+$/.test(mainOperatorName) ? mainOperatorName : `["${mainOperatorName}"]`;
     const groupOpenHeader = `${formattedMainOperatorName} = ${mainOperatorType} {`;
     const groupBlock = findBlockContent(content, groupOpenHeader, groupOperatorStartIndex);
-    const groupBody = groupBlock ? groupBlock.content : content.substring(groupOperatorStartIndex);
+    const groupBody = groupBlock ? groupBlock.content : content.substring(groupOperatorStartIndex + groupOpenHeader.length);
+    diagnostics.groupBodySnippet = groupBody.trim().substring(0, 200) + '...';
 
     // --- Pass 1: Create a flat list of all InstanceInputs and Page Comments ---
     const flatList = [];
     const inputsBlock = findTopLevelBlock(groupBody, "Inputs = ordered() {");
 
     if (inputsBlock) {
-        let currentPageName = "Controls"; // デフォルトは"Controls"
+        diagnostics.inputsBlockSnippet = inputsBlock.content.trim().substring(0, 200) + '...';
+        let currentPageName = "Controls";
 
-        // Regex to find InstanceInput blocks
         const instanceInputRegex = /([a-zA-Z0-9_]+)\s*=\s*InstanceInput\s*{/g;
         let inputMatch;
-
-        // まず、すべてのコントロールデータを収集
         const allControlData = [];
         while ((inputMatch = instanceInputRegex.exec(inputsBlock.content)) !== null) {
             const key = inputMatch[1];
@@ -116,46 +126,34 @@ export function parseSettingFile(content) {
             allControlData.push({ type: 'CONTROL_DATA', key, properties, originalBlock: fullOriginalBlock });
         }
 
-        // 収集したコントロールデータに基づいてPAGE_MARKERを挿入
         let firstControl = true;
         for (const item of allControlData) {
-            const pageProperty = item.properties.Page; // 'Page'プロパティをチェック
-
+            const pageProperty = item.properties.Page;
             if (firstControl) {
-                // 最初のコントロールの処理
                 if (pageProperty && pageProperty !== "Controls") {
                     currentPageName = pageProperty;
                     flatList.push({ type: 'PAGE_MARKER', name: currentPageName });
-                } else {
-                    // Pageプロパティがないか"Controls"の場合は、currentPageNameは"Controls"のまま
-                    // マーカーは挿入しない
                 }
                 firstControl = false;
             } else {
-                // 後続のコントロールの処理
                 if (pageProperty && pageProperty !== currentPageName) {
-                    // 新しいPageプロパティがあり、現在のページ名と異なる場合
                     flatList.push({ type: 'PAGE_MARKER', name: pageProperty });
                     currentPageName = pageProperty;
                 }
-                // Pageプロパティがない場合、または現在のページ名と同じ場合は、ページマーカーを挿入しない
-                // currentPageNameも変更しない（一度設定されたページは明示的に変更されるまで維持される）
             }
-
-            // Pageプロパティを削除
             if (item.properties.Page) {
                 delete item.properties.Page;
             }
-
-            flatList.push(item); // コントロールデータ自体を追加
+            flatList.push(item);
         }
     }
 
     // --- Pass 2: Read the helper node metadata, including LBLC_NumInputs ---
-const metadataMap = new Map();
-let maxAutoLabelIndex = 0;
-const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
+    const metadataMap = new Map();
+    let maxAutoLabelIndex = 0;
+    const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
     const originalTools = toolsBlock ? toolsBlock.content : '';
+    diagnostics.toolsBlockSnippet = originalTools.trim().substring(0, 200) + '...';
     const helperBlock = findBlockContent(originalTools, "background_helper = Background {");
 
     if (helperBlock) {
@@ -173,13 +171,13 @@ const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
                 const propertiesText = controlMatch[2];
                 const nameMatch = propertiesText.match(/LINKS_Name\s*=\s*"([^"]+)"/);
                 const nestLevelMatch = propertiesText.match(/LBLC_NestLevel\s*=\s*(\d+)/);
-                const numInputsMatch = propertiesText.match(/LBLC_NumInputs\s*=\s*(\d+)/); // <-- Extract LBLC_NumInputs
+                const numInputsMatch = propertiesText.match(/LBLC_NumInputs\s*=\s*(\d+)/);
 
                 if (nameMatch && nestLevelMatch && numInputsMatch) {
                     metadataMap.set(key, {
                         name: nameMatch[1],
                         nestLevel: parseInt(nestLevelMatch[1], 10),
-                        childCount: parseInt(numInputsMatch[1], 10) // <-- Store the child count
+                        childCount: parseInt(numInputsMatch[1], 10)
                     });
                 }
             }
@@ -189,14 +187,12 @@ const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
     // --- Pass 3: Reconstruct the tree using a recursive function ---
     function buildTreeRecursive(parent, items) {
         while (items.length > 0) {
-            const item = items.shift(); // Take the next item from the list
-
+            const item = items.shift();
             if (item.type === 'PAGE_MARKER') {
                 const pageNode = { id: nextId++, type: 'PAGE', name: item.name, parent: root, children: [] };
                 root.children.push(pageNode);
-                continue; // Continue processing siblings
+                continue;
             }
-
             if (item.type === 'CONTROL_DATA') {
                 const isGroup = metadataMap.has(item.properties.Source);
                 if (isGroup) {
@@ -211,12 +207,9 @@ const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
                         data: { key: item.key, originalBlock: item.originalBlock, properties: item.properties }
                     };
                     parent.children.push(groupNode);
-
-                    // Take the next `childCount` items and build the sub-tree recursively
                     const childrenToProcess = items.splice(0, metadata.childCount);
                     buildTreeRecursive(groupNode, childrenToProcess);
-
-                } else { // It's a standard control
+                } else {
                     const isMainInput = /^MainInput\d+$/i.test(item.key);
                     const controlNode = {
                         id: nextId++,
@@ -234,5 +227,5 @@ const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
 
     buildTreeRecursive(root, flatList);
 
-    return { tree: root, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex };
+    return { tree: root, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex, diagnostics };
 }

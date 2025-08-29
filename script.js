@@ -49,6 +49,10 @@ function processInputContent(content, filename = 'clipboard_macro.setting') {
         originalContent = content;
         originalFilename = filename;
         const result = parseSettingFile(originalContent);
+        // 解析結果が不正な場合にエラーを投げる
+        if (!result || !result.tree) {
+            throw new Error("Macro structure could not be parsed. Check if the file format is correct.");
+        }
         tree = result.tree;
         mainOperatorName = result.mainOperatorName;
         mainOperatorType = result.mainOperatorType;
@@ -58,7 +62,9 @@ function processInputContent(content, filename = 'clipboard_macro.setting') {
         lastSelectedId = null;
         render();
     } catch (error) {
-        alert(`Error processing input: ${error.message}`);
+        // ユーザー向けのアラートをより分かりやすくする
+        alert(`読み込みに失敗しました。\n\n[エラー詳細]\n${error.message}`);
+        // コンソールには詳細なエラーオブジェクトを出力する
         console.error('Error during input processing:', error);
     }
 }

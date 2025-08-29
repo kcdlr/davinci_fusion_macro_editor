@@ -78,11 +78,12 @@ export function parseSettingFile(content) {
 
     // Match either “GroupOperator” or “MacroOperator” so the parser works for both types
     // Capture both the operator name and its type (GroupOperator or MacroOperator)
-    const groupOperatorMatch = content.match(/(\w+)\s*=\s*(GroupOperator|MacroOperator)\s*{/);
-    const mainOperatorName = groupOperatorMatch ? groupOperatorMatch[1] : 'MyMacro';
-    const mainOperatorType = groupOperatorMatch ? groupOperatorMatch[2] : 'GroupOperator';
+    const groupOperatorMatch = content.match(/(?:\["([^"]+)"\]|(\w+))\s*=\s*(GroupOperator|MacroOperator)\s*{/);
+    const mainOperatorName = groupOperatorMatch ? (groupOperatorMatch[1] || groupOperatorMatch[2]) : 'MyMacro';
+    const mainOperatorType = groupOperatorMatch ? groupOperatorMatch[3] : 'GroupOperator';
     const groupOperatorStartIndex = groupOperatorMatch ? groupOperatorMatch.index : 0;
-    const groupOpenHeader = `${mainOperatorName} = ${mainOperatorType} {`;
+    const formattedMainOperatorName = /^\w+$/.test(mainOperatorName) ? mainOperatorName : `["${mainOperatorName}"]`;
+    const groupOpenHeader = `${formattedMainOperatorName} = ${mainOperatorType} {`;
     const groupBlock = findBlockContent(content, groupOpenHeader, groupOperatorStartIndex);
     const groupBody = groupBlock ? groupBlock.content : content.substring(groupOperatorStartIndex);
 

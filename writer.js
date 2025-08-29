@@ -245,7 +245,8 @@ ${userControls.join('\n')}
 
     const newToolsBlock = `Tools = ordered() {\n${newToolsBlockContent}\n            }`;
 
-    const mainHeader = `${mainOperatorName} = ${mainOperatorType} {`;
+    const formattedMainOperatorName = /^\w+$/.test(mainOperatorName) ? mainOperatorName : `["${mainOperatorName}"]`;
+    const mainHeader = `${formattedMainOperatorName} = ${mainOperatorType} {`;
     const mainHeaderIndex = originalContent.indexOf(mainHeader);
     const groupBlockInfo = findBlockContent(originalContent, mainHeader, Math.max(0, mainHeaderIndex));
     const groupBody = groupBlockInfo ? groupBlockInfo.content : originalContent;
@@ -268,7 +269,7 @@ ${userControls.join('\n')}
 
     const finalContent = `{
     Tools = ordered() {
-        ${mainOperatorName} = ${mainOperatorType} {${newGroupOperatorContent}}
+        ${formattedMainOperatorName} = ${mainOperatorType} {${newGroupOperatorContent}}
     },
     ActiveTool = "${mainOperatorName}"
 }`;

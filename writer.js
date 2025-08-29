@@ -68,13 +68,6 @@ function findFirstTopLevelBlock(body, headers) {
     return null;
 }
 
-function indentLines(text, indent = "                ") {
-    return text
-        .split("\n")
-        .map(line => indent + line)
-        .join("\n");
-}
-
 function indentFirstLine(text, indent = "                ") {
     const nl = text.indexOf("\n");
     if (nl === -1) return indent + text;
@@ -265,7 +258,7 @@ ${userControls.join('\n')}
         viewInfoBlockString.trim(),
         newToolsBlock.trim()
     ];
-    const newGroupOperatorContent = `\n            ${groupOperatorParts.join(',\n            ')}\n        `;
+    const newGroupOperatorContent = `\n            ${groupOperatorParts.join(',\n')}\n        `;
 
     const finalContent = `{
     Tools = ordered() {

@@ -258,7 +258,7 @@ ${userControls.join('\n')}
         viewInfoBlockString.trim(),
         newToolsBlock.trim()
     ];
-    const newGroupOperatorContent = `\n            ${groupOperatorParts.join(',\n')}\n        `;
+    const newGroupOperatorContent = `\n            ${groupOperatorParts.join(',\n        ')}\n        `;
 
     const finalContent = `{
     Tools = ordered() {

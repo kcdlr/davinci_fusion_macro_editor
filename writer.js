@@ -213,6 +213,7 @@ ${userControlInputs.join('\n')}
                     },
                     ViewInfo = OperatorInfo { Pos = { 0, -100 } },
                     UserControls = ordered() {
+						Separator = { INPID_InputControl = "SeparatorControl", },
 ${userControls.join('\n')}
                     }
                 }`

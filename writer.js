@@ -170,7 +170,7 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
                 });
             }
             countDescendants(node);
-            userControls.push(`                        ${internalKey} = { LBLC_DropDownButton = true, INPID_InputControl = "LabelControl", LBLC_NumInputs = ${descendantCount}, LBLC_NestLevel = ${getDepth(node) + 1}, LINKID_DataType = "Number", LINKS_Name = "${node.name}", },`);
+            userControls.push(`                        ${internalKey} = { INP_Passive = true, INP_External = false, LBLC_DropDownButton = true, INPID_InputControl = "LabelControl", LBLC_NumInputs = ${descendantCount}, LBLC_NestLevel = ${getDepth(node) + 1}, LINKID_DataType = "Number", LINKS_Name = "${node.name}", },`);
             userControlInputs.push(`                        ${internalKey} = Input { Value = 1, },`);
             return `                ${node.data?.key || internalKey} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "${internalKey}"\n                }`;
         }

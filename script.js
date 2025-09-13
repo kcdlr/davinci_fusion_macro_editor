@@ -20,6 +20,7 @@ const ui = {
     groupBtn: document.getElementById('group-btn'),
     renameBtn: document.getElementById('rename-btn'),
     pageBtn: document.getElementById('page-btn'),
+    separatorBtn: document.getElementById('separator-btn'),
     deleteBtn: document.getElementById('delete-btn'),
     pasteBtn: document.getElementById('paste-btn'),
     outputBtn: document.getElementById('output-btn'),
@@ -50,14 +51,10 @@ function processInputContent(content, filename = 'clipboard_macro.setting') {
         originalFilename = filename;
         const result = parseSettingFile(originalContent);
 
-        // ファイルに中身があるにも関わらず、解析後のツリーが空の場合はエラーとする
         if (content.trim() !== '' && (!result || !result.tree || result.tree.children.length === 0)) {
-            // ▼▼▼【ここから変更】▼▼▼
-            // エラーを投げる際に、診断ログを添付する
             const error = new Error("ファイルの解析に失敗しました。対応していない形式か、ファイルが破損している可能性があります。");
-            error.diagnostics = result.diagnostics; // 診断ログをエラーオブジェクトに格納
+            error.diagnostics = result.diagnostics;
             throw error;
-            // ▲▲▲【ここまで変更】▲▲▲
         }
 
         tree = result.tree;
@@ -69,10 +66,7 @@ function processInputContent(content, filename = 'clipboard_macro.setting') {
         lastSelectedId = null;
         render();
     } catch (error) {
-        // ユーザー向けアラート
         alert(`読み込みに失敗しました。\n\n[エラー]\n${error.message}`);
-
-        // 開発者コンソールへの、より良いレポート出力
         console.error("======= Macro Parsing Failed: Diagnostic Report =======");
         console.error("Error: ", error.message);
         if (error.diagnostics) {
@@ -82,7 +76,7 @@ function processInputContent(content, filename = 'clipboard_macro.setting') {
             console.log("Extracted 'inputsBlock' (first 200 chars):\n", error.diagnostics.inputsBlockSnippet);
             console.log("Extracted 'toolsBlock' (first 200 chars):\n", error.diagnostics.toolsBlockSnippet);
         }
-        console.error("Full error object: ", error); // 詳細なスタックトレースも残す
+        console.error("Full error object: ", error);
         console.error("=====================================================");
     }
 }
@@ -113,22 +107,32 @@ const render = () => {
 
     flatList.forEach(item => {
         const li = document.createElement('li');
+        const contentDiv = document.createElement('div');
+
         li.dataset.id = item.id;
         li.className = `list-item ${item.type.toLowerCase()}-item`;
-        li.style.paddingLeft = `${10 + item.depth * 20}px`;
-        if (selectedIds.has(item.id)) { li.classList.add('selected'); }
+        li.style.paddingLeft = `${item.depth * 20}px`;
+
+        contentDiv.className = 'list-item-content';
+        if (selectedIds.has(item.id)) {
+            contentDiv.classList.add('selected');
+        }
+
         switch (item.type) {
             case 'CONTROL':
-                li.textContent = `${item.data.properties.Name || item.data.properties.LINKS_Name || item.data.properties.Source || item.data.key}`;
+                contentDiv.textContent = `${item.data.properties.Name || item.data.properties.LINKS_Name || item.data.properties.Source || item.data.key}`;
                 break;
             case 'GROUP':
-                li.textContent = `▶ ${item.name}`;
+                contentDiv.textContent = `▶ ${item.name}`;
                 break;
             case 'PAGE':
-                li.textContent = `--- Page: ${item.name} ---`;
-                li.style.paddingLeft = '10px';
+                contentDiv.textContent = `--- Page: ${item.name} ---`;
+                break;
+            case 'SEPARATOR':
+                contentDiv.textContent = '--- Separator ---';
                 break;
         }
+        li.appendChild(contentDiv);
         ui.controlsList.appendChild(li);
     });
     updateButtonStates();
@@ -143,6 +147,7 @@ const updateButtonStates = () => {
     ui.outputBtn.disabled = tree.children.length === 0;
     ui.groupBtn.disabled = !hasSelection;
     ui.pageBtn.disabled = !isSingleSelection;
+    ui.separatorBtn.disabled = !isSingleSelection;
     ui.deleteBtn.disabled = !hasSelection;
 
     if (!hasSelection) {
@@ -155,7 +160,7 @@ const updateButtonStates = () => {
     }
 
     const firstNode = nodeMap.get(Array.from(selectedIds)[0]);
-    if(!firstNode) return;
+    if (!firstNode) return;
 
     const canRename = isSingleSelection && ((firstNode.type === 'GROUP' || firstNode.type === 'PAGE') || (firstNode.type === 'CONTROL' && !firstNode.hidden));
     ui.renameBtn.disabled = !canRename;
@@ -176,7 +181,7 @@ const updateButtonStates = () => {
     ui.moveDownBtn.disabled = currentIndex === siblings.length - 1;
 
     const itemAbove = currentIndex > 0 ? siblings[currentIndex - 1] : null;
-    const canIndent = itemAbove && itemAbove.type === 'GROUP' && (firstNode.type === 'CONTROL' || firstNode.type === 'GROUP') && firstNode.parent === itemAbove.parent;
+    const canIndent = itemAbove && itemAbove.type === 'GROUP' && (firstNode.type === 'CONTROL' || firstNode.type === 'GROUP' || firstNode.type === 'SEPARATOR') && firstNode.parent === itemAbove.parent;
     ui.indentBtn.disabled = !canIndent;
 
     const canOutdent = parent && parent.type === 'GROUP';
@@ -205,6 +210,10 @@ const updatePropertyEditor = () => {
         case 'PAGE':
             ui.propName.value = node.name;
             break;
+        case 'SEPARATOR':
+            ui.propertyEditor.style.display = 'none';
+            ui.noSelection.style.display = 'block';
+            return;
     }
 };
 
@@ -277,7 +286,7 @@ ui.groupBtn.addEventListener('click', () => {
     const name = prompt("Enter group name:", "New Group");
     if (!name) return;
 
-    const selectedNodes = Array.from(selectedIds).map(id => nodeMap.get(id)).sort((a,b) => a.parent.children.indexOf(a) - b.parent.children.indexOf(b));
+    const selectedNodes = Array.from(selectedIds).map(id => nodeMap.get(id)).sort((a, b) => a.parent.children.indexOf(a) - b.parent.children.indexOf(b));
     const firstNode = selectedNodes[0];
     const parent = firstNode.parent;
     const siblings = parent.children;
@@ -347,6 +356,25 @@ ui.pageBtn.addEventListener('click', () => {
 
     const newPage = { id: Date.now(), type: 'PAGE', name, parent: tree, children: [] };
     siblings.splice(index, 0, newPage);
+    render();
+});
+
+ui.separatorBtn.addEventListener('click', () => {
+    addClickFeedback(ui.separatorBtn);
+    if (selectedIds.size !== 1) return;
+
+    const selectedNode = nodeMap.get(selectedIds.values().next().value);
+    if (!selectedNode) return;
+
+    const parent = selectedNode.parent;
+    if (!parent) return;
+
+    const siblings = parent.children;
+    const index = siblings.indexOf(selectedNode);
+    if (index === -1) return;
+
+    const newSeparator = { id: Date.now(), type: 'SEPARATOR', parent: parent, children: [], data: { key: `Separator${Date.now()}` } };
+    siblings.splice(index, 0, newSeparator);
     render();
 });
 

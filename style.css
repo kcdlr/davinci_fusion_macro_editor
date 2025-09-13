@@ -19,7 +19,7 @@ body {
     color: var(--text-color);
     margin: 0;
     padding: 1rem; /* 全体のパディングを維持 */
-    padding-top: calc(1rem + 150px); /* 固定ヘッダーの高さ分を考慮 */
+    padding-top: calc(1rem + 110px); /* 固定ヘッダーの高さ分を考慮 */
     display: flex;
     flex-direction: column;
     min-height: 100vh; /* ビューポートの高さいっぱいにする */
@@ -118,25 +118,36 @@ button:disabled {
 }
 
 .list-item {
-    padding: 6px 10px;
     border-bottom: 1px solid var(--secondary-bg);
     cursor: pointer;
     user-select: none;
     display: flex;
     align-items: center;
-    transition: background-color 0.1s;
     font-size: 14px;
 }
+
+.list-item-content {
+    flex-grow: 1;
+    padding: 6px 10px;
+    transition: background-color 0.1s;
+}
+
 
 .list-item:last-child {
     border-bottom: none;
 }
 
-.list-item.control-item { background-color: var(--color-control); }
-.list-item.group-item { background-color: var(--color-group); font-weight: 600; }
-.list-item.page-item { background-color: var(--color-page); color: #7fcdf0; font-style: italic; justify-content: center; }
+.control-item .list-item-content { background-color: var(--color-control); }
+.group-item .list-item-content { background-color: var(--color-group); font-weight: 600; }
+.page-item .list-item-content { background-color: var(--color-page); color: #7fcdf0; font-style: italic; text-align: center; }
+.separator-item .list-item-content {
+    background-color: var(--primary-bg);
+    color: var(--border-color);
+    font-style: italic;
+    text-align: center;
+}
 
-.list-item.selected {
+.list-item-content.selected {
     background-color: var(--color-selected) !important;
     color: white;
 }
@@ -161,8 +172,21 @@ button:disabled {
     border-radius: 4px;
 }
 
+.output-trigger-area {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+#output-btn {
+    padding: 12px 24px;
+    font-size: 16px;
+    background-color: var(--accent-color);
+    border-color: #1c8cd1;
+    color: white;
+}
+
 #output-area {
-    margin-top: 1rem; /* mainとの間にスペースを設ける */
+    margin-top: 0;
 }
 
 #output-text {

@@ -120,10 +120,15 @@ export function parseSettingFile(content) {
             const properties = {};
             const propsRegex = /(\w+)\s*=\s*(?:"([^"]*)"|({[^}]*})|([^,}\s]+))/g;
             let propMatch;
-            while((propMatch = propsRegex.exec(controlContent.content)) !== null){
+            while ((propMatch = propsRegex.exec(controlContent.content)) !== null) {
                 properties[propMatch[1]] = propMatch[2] || propMatch[3] || propMatch[4];
             }
-            allControlData.push({ type: 'CONTROL_DATA', key, properties, originalBlock: fullOriginalBlock });
+
+            if (properties.Source === 'Separator') {
+                allControlData.push({ type: 'SEPARATOR_DATA', key, properties, originalBlock: fullOriginalBlock });
+            } else {
+                allControlData.push({ type: 'CONTROL_DATA', key, properties, originalBlock: fullOriginalBlock });
+            }
         }
 
         let firstControl = true;
@@ -161,7 +166,7 @@ export function parseSettingFile(content) {
         if (userControlsBlock) {
             const controlRegex = /(AutoLabel\d+)\s*=\s*{([^}]+)}/g;
             let controlMatch;
-            while((controlMatch = controlRegex.exec(userControlsBlock.content)) !== null) {
+            while ((controlMatch = controlRegex.exec(userControlsBlock.content)) !== null) {
                 const key = controlMatch[1];
                 const numCap = key.match(/AutoLabel(\d+)/);
                 if (numCap) {
@@ -191,6 +196,18 @@ export function parseSettingFile(content) {
             if (item.type === 'PAGE_MARKER') {
                 const pageNode = { id: nextId++, type: 'PAGE', name: item.name, parent: root, children: [] };
                 root.children.push(pageNode);
+                continue;
+            }
+            if (item.type === 'SEPARATOR_DATA') {
+                const separatorNode = {
+                    id: nextId++,
+                    type: 'SEPARATOR',
+                    data: { key: item.key, originalBlock: item.originalBlock, properties: item.properties },
+                    parent: parent,
+                    children: [],
+                    hidden: false
+                };
+                parent.children.push(separatorNode);
                 continue;
             }
             if (item.type === 'CONTROL_DATA') {

@@ -80,13 +80,11 @@ function updateInstanceInputName(block, newName) {
     try {
         const escaped = String(newName).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-        // Try to replace existing Name property (keep existing indentation and trailing comma)
         const namePropRegex = /(\n[ \t]*Name\s*=\s*)("([^"]*)"|[^,}\n]+)(\s*,?)/;
         if (namePropRegex.test(block)) {
             return block.replace(namePropRegex, `$1"${escaped}",`);
         }
 
-        // Otherwise insert Name as the first property after the opening brace
         const braceIdx = block.indexOf('{');
         if (braceIdx === -1) return block;
 
@@ -94,7 +92,6 @@ function updateInstanceInputName(block, newName) {
         const insertPos = newlineIdx === -1 ? braceIdx + 1 : newlineIdx + 1;
 
         const after = block.slice(insertPos);
-        // Try to infer indentation from the next line; fallback to 20 spaces if not found
         const indentMatch = after.match(/^([ \t]+)/);
         const indent = indentMatch ? indentMatch[1] : '                    ';
 
@@ -110,7 +107,8 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
     const userControls = [];
     const userControlInputs = [];
     const mainInputs = [];
-    // Determine the highest existing AutoLabel index from both the parsed file and the current in-memory tree
+    let separatorCounter = 1;
+
     let maxFromTree = 0;
     (function scan(node) {
         if (node && node.type === 'GROUP' && node.internalKey) {
@@ -128,8 +126,8 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
     function getDepth(node) {
         let depth = 0;
         let current = node.parent;
-        while(current && current.type !== 'ROOT') {
-            if(current.type === 'GROUP') depth++;
+        while (current && current.type !== 'ROOT') {
+            if (current.type === 'GROUP') depth++;
             current = current.parent;
         }
         return depth;
@@ -137,7 +135,6 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
 
     function addPageProperty(textBlock, pageName) {
         if (!pageName) return textBlock;
-        // 引用符で囲まれた値と囲まれていない値の両方に一致するように正規表現を更新
         if (textBlock.match(/Page\s*=\s*(?:"[^"]*"|[^,}\s]+)/)) {
             return textBlock.replace(/Page\s*=\s*(?:"[^"]*"|[^,}\s]+)/, `Page = "${pageName}"`);
         } else {
@@ -148,7 +145,6 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
     function generateBaseBlock(node) {
         if (node.type === 'CONTROL') {
             let block = node.data.originalBlock;
-            // If this control was renamed via UI, reflect it into the InstanceInput block as Name
             if (node.data && node.data.__renamed) {
                 const newName = node.data.properties ? node.data.properties.Name : null;
                 if (newName && typeof newName === 'string') {
@@ -174,6 +170,9 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
             userControlInputs.push(`                        ${internalKey} = Input { Value = 1, },`);
             return `                ${node.data?.key || internalKey} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "${internalKey}"\n                }`;
         }
+        else if (node.type === 'SEPARATOR') {
+            return `                ${node.data.key || `Separator${separatorCounter++}`} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "Separator"\n                }`;
+        }
         return '';
     }
 
@@ -184,16 +183,15 @@ export function generateSettingFile(tree, originalContent, originalFilename, mai
         return list;
     })(tree);
 
-    let currentPageName = null; // ページ名を追跡する変数を追加
+    let currentPageName = null;
 
     for (let i = 0; i < flatList.length; i++) {
         const item = flatList[i];
         if (item.type === 'PAGE') {
-            // ページマーカーコメントは不要なので削除
-            currentPageName = item.name; // ページマーカーが見つかったらページ名を更新
+            currentPageName = item.name;
         } else {
             let baseBlock = generateBaseBlock(item);
-            if (currentPageName) { // currentPageNameが設定されていればPageプロパティを追加
+            if (currentPageName) {
                 baseBlock = addPageProperty(baseBlock, currentPageName);
             }
             mainInputs.push(baseBlock);
@@ -224,16 +222,11 @@ ${userControls.join('\n')}
         cleanedTools = originalTools.substring(0, helperBlockInfo.startIndex) + originalTools.substring(helperBlockInfo.endIndex);
     }
 
-    // 3. Assemble the Tools block with explicit, controlled comma placement
     let newToolsBlockContent = newHelperNode;
 
-    // cleanedToolsに中身がある場合のみ処理
     if (cleanedTools.trim()) {
-        // 先頭の空白・カンマだけを除去（内部の既存インデントは保持）
         const cleanedHead = cleanedTools.replace(/^[\s,]*/, '');
-        // 次行の先頭（最初の行）だけ Tools レベルのインデントを付与
         const indentedHeadOnce = indentFirstLine(cleanedHead, "                ");
-        // 確実にカンマを1つだけ追加して結合する
         newToolsBlockContent += ',\n' + indentedHeadOnce;
     }
 

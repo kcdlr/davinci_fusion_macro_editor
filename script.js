@@ -3,12 +3,9 @@ import { parseSettingFile } from './parser.js';
 import { generateSettingFile } from './writer.js';
 
 let tree = { id: 0, type: 'ROOT', children: [], parent: null };
+let segments = [];
 let nodeMap = new Map();
-let originalContent = '';
 let originalFilename = 'macro.setting';
-let mainOperatorName = 'MyMacro';
-let mainOperatorType = 'GroupOperator';
-let originalTools = '';
 let maxAutoLabelIndex = 0;
 let selectedIds = new Set();
 let lastSelectedId = null;
@@ -47,20 +44,17 @@ function addClickFeedback(button) {
 
 function processInputContent(content, filename = 'clipboard_macro.setting') {
     try {
-        originalContent = content;
         originalFilename = filename;
-        const result = parseSettingFile(originalContent);
+        const result = parseSettingFile(content);
 
-        if (content.trim() !== '' && (!result || !result.tree || result.tree.children.length === 0)) {
+        if (content.trim() !== '' && (!result || !result.tree || !result.segments || result.tree.children.length === 0)) {
             const error = new Error("ファイルの解析に失敗しました。対応していない形式か、ファイルが破損している可能性があります。");
             error.diagnostics = result.diagnostics;
             throw error;
         }
 
         tree = result.tree;
-        mainOperatorName = result.mainOperatorName;
-        mainOperatorType = result.mainOperatorType;
-        originalTools = result.originalTools;
+        segments = result.segments;
         maxAutoLabelIndex = result.maxAutoLabelIndex || 0;
         selectedIds.clear();
         lastSelectedId = null;
@@ -471,7 +465,7 @@ ui.outdentBtn.addEventListener('click', () => {
 ui.outputBtn.addEventListener('click', () => {
     addClickFeedback(ui.outputBtn);
     try {
-        const { content } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex);
+        const { content } = generateSettingFile(tree, segments, originalFilename, maxAutoLabelIndex);
         ui.outputText.value = content;
     } catch (error) {
         alert(`Error generating output: ${error.message}`);
@@ -490,7 +484,7 @@ ui.copyOutputBtn.addEventListener('click', () => {
 ui.downloadOutputBtn.addEventListener('click', () => {
     addClickFeedback(ui.downloadOutputBtn);
     try {
-        const { content, filename } = generateSettingFile(tree, originalContent, originalFilename, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex);
+        const { content, filename } = generateSettingFile(tree, segments, originalFilename, maxAutoLabelIndex);
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);

@@ -1,126 +1,177 @@
 // parser.js
 
 /**
- * A helper function to safely find the content within a matched pair of braces {}.
- * @param {string} content The string to search within.
- * @param {string} blockStartMarker The text immediately preceding the opening brace.
- * @param {number} startIndex The position in the content to start searching from.
- * @returns {{content: string, startIndex: number, endIndex: number}|null}
+ * Finds a block enclosed by braces, handling nested braces correctly.
+ * @param {string} text The text to search within.
+ * @param {RegExp} headerRegex The regex to find the header immediately preceding the opening brace.
+ * @param {number} [searchFrom=0] The index to start searching from.
+ * @param {boolean} [consumeComma=false] If true, consumes a trailing comma and whitespace after the block.
+ * @returns {object|null} An object with `header`, `content`, `fullText`, `startIndex`, and `endIndex`, or null.
  */
-function findBlockContent(content, blockStartMarker, startIndex = 0) {
-    const startMarkerIndex = content.indexOf(blockStartMarker, startIndex);
-    if (startMarkerIndex === -1) return null;
+function findBlock(text, headerRegex, searchFrom = 0, consumeComma = true) {
+    const searchText = text.substring(searchFrom);
+    const match = searchText.match(headerRegex);
+    if (!match) return null;
 
-    const blockContentStartIndex = startMarkerIndex + blockStartMarker.length;
-    let braceDepth = 1;
-    let blockEndIndex = -1;
+    const header = match[0];
+    const startIndex = match.index + searchFrom;
+    const contentStartIndex = startIndex + header.length;
 
-    for (let i = blockContentStartIndex; i < content.length; i++) {
-        if (content[i] === '{') braceDepth++;
-        else if (content[i] === '}') {
-            braceDepth--;
-            if (braceDepth === 0) {
-                blockEndIndex = i;
+    let braceCount = 1;
+    let contentEndIndex = -1;
+    for (let i = contentStartIndex; i < text.length; i++) {
+        if (text[i] === '{') {
+            braceCount++;
+        } else if (text[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+                contentEndIndex = i;
                 break;
             }
         }
     }
-    if (blockEndIndex === -1) return null;
+    if (contentEndIndex === -1) return null;
 
-    return {
-        content: content.substring(blockContentStartIndex, blockEndIndex),
-        startIndex: startMarkerIndex,
-        endIndex: blockEndIndex + 1
-    };
-}
+    let endIndex = contentEndIndex + 1; // `}` の直後を指す
 
-function findTopLevelBlock(body, header) {
-    if (!body) return null;
-    let depth = 0;
-    for (let i = 0; i < body.length; i++) {
-        const ch = body[i];
-        if (ch === '{') depth++;
-        else if (ch === '}') depth = Math.max(0, depth - 1);
-
-        if (depth === 0 && body.startsWith(header, i)) {
-            const bracePos = body.indexOf('{', i + header.length - 1);
-            if (bracePos === -1) return null;
-            let d = 1;
-            let j = bracePos + 1;
-            while (j < body.length && d > 0) {
-                const cj = body[j];
-                if (cj === '{') d++;
-                else if (cj === '}') d--;
-                j++;
-            }
-            if (d === 0) {
-                return {
-                    content: body.substring(bracePos + 1, j - 1),
-                    startIndex: i,
-                    endIndex: j
-                };
-            } else {
-                return null;
-            }
+    if (consumeComma) {
+        const trailingText = text.substring(endIndex);
+        const commaMatch = trailingText.match(/^[\s\t]*,+/);
+        if (commaMatch) {
+            endIndex += commaMatch[0].length;
         }
     }
-    return null;
+
+    const fullText = text.substring(startIndex, endIndex);
+    const content = text.substring(contentStartIndex, contentEndIndex);
+
+    return { header, content, fullText, startIndex, endIndex };
 }
 
 /**
- * Parses the .setting file using a robust, multi-pass approach.
- * @param {string} content The string content of the .setting file.
- * @returns {object} An object containing the reconstructed tree and other macro metadata.
+ * Phase 1: Parses a .setting file and breaks it down into a linear list of segments.
+ * @param {string} fileContent The entire string content of the .setting file.
+ * @returns {{segments: Array<object>, diagnostics: object}}
  */
-export function parseSettingFile(content) {
+function parseFileIntoSegments(fileContent) {
+    const diagnostics = {};
+    const foundBlocks = [];
+
+    const mainGroupRegex = /(?:\["([^"]+)"\]|(\w+))[\s\t]*=[\s\t]*(GroupOperator|MacroOperator)[\s\t]*{/;
+    const mainGroupResult = findBlock(fileContent, mainGroupRegex);
+
+
+    if (mainGroupResult) {
+        const groupBodyOffset = mainGroupResult.startIndex + mainGroupResult.header.length;
+        const groupBody = mainGroupResult.content;
+
+        const inputsRegex = /[\s\t]*Inputs[\s\t]*=[\s\t]*ordered\(\)[\s\t]*{/;
+        const inputsResult = findBlock(groupBody, inputsRegex, 0, true);
+        if (inputsResult) {
+            foundBlocks.push({
+                type: 'inputs_block',
+                startIndex: groupBodyOffset + inputsResult.startIndex,
+                endIndex: groupBodyOffset + inputsResult.endIndex,
+                content: inputsResult.content,
+                fullText: inputsResult.fullText
+            });
+        }
+
+        const toolsRegex = /[\s\t]*Tools[\s\t]*=[\s\t]*ordered\(\)[\s\t]*{/;
+        const toolsResult = findBlock(groupBody, toolsRegex, 0, true);
+        if (toolsResult) {
+            const toolsBodyOffset = toolsResult.startIndex + toolsResult.header.length;
+            const toolsBody = toolsResult.content;
+
+            const helperRegex = /[\s\t]*background_helper[\s\t]*=[\s\t]*Background[\s\t]*{/;
+            const helperResult = findBlock(toolsBody, helperRegex, 0, true);
+            if (helperResult) {
+                foundBlocks.push({
+                    type: 'helper_block',
+                    startIndex: groupBodyOffset + toolsBodyOffset + helperResult.startIndex,
+                    endIndex: groupBodyOffset + toolsBodyOffset + helperResult.endIndex,
+                    content: helperResult.content,
+                    fullText: helperResult.fullText
+                });
+            } else {
+                const firstNewlineInTools = toolsBody.indexOf('\n');
+                const insertionOffset = (firstNewlineInTools !== -1) ? firstNewlineInTools + 1 : 0;
+                const insertionIndex = groupBodyOffset + toolsBodyOffset + insertionOffset;
+                foundBlocks.push({
+                    type: 'helper_block',
+                    startIndex: insertionIndex,
+                    endIndex: insertionIndex,
+                    content: '',
+                    fullText: ''
+                });
+            }
+        }
+    }
+
+    foundBlocks.sort((a, b) => a.startIndex - b.startIndex);
+    const segments = [];
+    let currentIndex = 0;
+    for (const block of foundBlocks) {
+        if (block.startIndex > currentIndex) {
+            segments.push({ type: 'string', content: fileContent.substring(currentIndex, block.startIndex) });
+        }
+        segments.push({ type: block.type, content: block.content, fullText: block.fullText });
+        currentIndex = block.endIndex;
+    }
+    if (currentIndex < fileContent.length) {
+        segments.push({ type: 'string', content: fileContent.substring(currentIndex) });
+    }
+
+    return { segments, diagnostics };
+}
+
+
+/**
+ * Phase 2: Builds the hierarchical tree from the content of the input and helper blocks.
+ * @param {string} inputsBlockContent The content of the 'Inputs' block.
+ * @param {string} helperBlockContent The content of the 'background_helper' block.
+ * @param {object} diagnostics A reference to the diagnostics object to populate.
+ * @returns {{tree: object, maxAutoLabelIndex: number}}
+ */
+function buildTreeFromContent(inputsBlockContent, helperBlockContent, diagnostics) {
     let nextId = 0;
     const root = { id: nextId++, type: 'ROOT', children: [], parent: null };
 
-    const diagnostics = {
-        foundGroupOperator: "No",
-        groupBodySnippet: "N/A",
-        inputsBlockSnippet: "N/A",
-        toolsBlockSnippet: "N/A"
-    };
-
-    const groupOperatorMatch = content.match(/(?:\["([^"]+)"\]|(\w+))\s*=\s*(GroupOperator|MacroOperator)\s*{/);
-    if (!groupOperatorMatch) {
-        return { tree: root, mainOperatorName: '', mainOperatorType: '', originalTools: '', maxAutoLabelIndex: 0, diagnostics };
-    }
-    diagnostics.foundGroupOperator = "Yes";
-
-    const mainOperatorName = groupOperatorMatch[1] || groupOperatorMatch[2];
-    const mainOperatorType = groupOperatorMatch[3];
-    const groupOperatorStartIndex = groupOperatorMatch.index;
-
-    const formattedMainOperatorName = /^\w+$/.test(mainOperatorName) ? mainOperatorName : `["${mainOperatorName}"]`;
-    const groupOpenHeader = `${formattedMainOperatorName} = ${mainOperatorType} {`;
-    const groupBlock = findBlockContent(content, groupOpenHeader, groupOperatorStartIndex);
-    const groupBody = groupBlock ? groupBlock.content : content.substring(groupOperatorStartIndex + groupOpenHeader.length);
-    diagnostics.groupBodySnippet = groupBody.trim().substring(0, 200) + '...';
-
-    // --- Pass 1: Create a flat list of all InstanceInputs and Page Comments ---
+    // --- Pass 1: Create a flat list of all InstanceInputs and Page Comments from the inputs_block ---
     const flatList = [];
-    const inputsBlock = findTopLevelBlock(groupBody, "Inputs = ordered() {");
-
-    if (inputsBlock) {
-        diagnostics.inputsBlockSnippet = inputsBlock.content.trim().substring(0, 200) + '...';
+    if (inputsBlockContent) {
+        diagnostics.inputsBlockSnippet = inputsBlockContent.trim().substring(0, 200) + '...';
         let currentPageName = "Controls";
 
-        const instanceInputRegex = /([a-zA-Z0-9_]+)\s*=\s*InstanceInput\s*{/g;
-        let inputMatch;
+        const instanceInputRegex = /([a-zA-Z0-9_]+)[\s\t]*=[\s\t]*InstanceInput[\s\t]*{([^}]*)}/g;
+        let match;
         const allControlData = [];
-        while ((inputMatch = instanceInputRegex.exec(inputsBlock.content)) !== null) {
-            const key = inputMatch[1];
-            const blockStart = inputMatch.index + inputMatch[0].length - 1;
-            const controlContent = findBlockContent(inputsBlock.content, "{", blockStart);
-            if (!controlContent) continue;
 
-            const fullOriginalBlock = inputsBlock.content.substring(inputMatch.index, controlContent.endIndex).trim();
+        // Extract full block text for each input
+        const rawInputs = inputsBlockContent.split(/([a-zA-Z0-9_]+[\s\t]*=[\s\t]*InstanceInput[\s\t]*{)/).slice(1);
+        for (let i = 0; i < rawInputs.length; i += 2) {
+            const header = rawInputs[i];
+            const key = header.match(/([a-zA-Z0-9_]+)/)[0];
+            const bodySearch = rawInputs[i+1];
+
+            let braceDepth = 1;
+            let endIndex = -1;
+            for(let j=0; j<bodySearch.length; j++){
+                if(bodySearch[j] === '{') braceDepth++;
+                if(bodySearch[j] === '}') braceDepth--;
+                if(braceDepth === 0){
+                    endIndex = j;
+                    break;
+                }
+            }
+            if(endIndex === -1) continue;
+
+            const content = bodySearch.substring(0, endIndex);
+            const fullOriginalBlock = header + content + '}';
             const properties = {};
-            const propsRegex = /(\w+)\s*=\s*(?:"([^"]*)"|({[^}]*})|([^,}\s]+))/g;
+            const propsRegex = /(\w+)[\s\t]*=[\s\t]*(?:"([^"]*)"|({[^}]*})|([^,}[\s\t]]+))/g;
             let propMatch;
-            while ((propMatch = propsRegex.exec(controlContent.content)) !== null) {
+            while ((propMatch = propsRegex.exec(content)) !== null) {
                 properties[propMatch[1]] = propMatch[2] || propMatch[3] || propMatch[4];
             }
 
@@ -130,6 +181,7 @@ export function parseSettingFile(content) {
                 allControlData.push({ type: 'CONTROL_DATA', key, properties, originalBlock: fullOriginalBlock });
             }
         }
+
 
         let firstControl = true;
         for (const item of allControlData) {
@@ -153,30 +205,26 @@ export function parseSettingFile(content) {
         }
     }
 
-    // --- Pass 2: Read the helper node metadata, including LBLC_NumInputs ---
+
+    // --- Pass 2: Read the helper node metadata from the helper_block ---
     const metadataMap = new Map();
     let maxAutoLabelIndex = 0;
-    const toolsBlock = findTopLevelBlock(groupBody, "Tools = ordered() {");
-    const originalTools = toolsBlock ? toolsBlock.content : '';
-    diagnostics.toolsBlockSnippet = originalTools.trim().substring(0, 200) + '...';
-    const helperBlock = findBlockContent(originalTools, "background_helper = Background {");
-
-    if (helperBlock) {
-        const userControlsBlock = findBlockContent(helperBlock.content, "UserControls = ordered() {");
+    if (helperBlockContent) {
+        diagnostics.helperBlockSnippet = helperBlockContent.trim().substring(0, 200) + '...';
+        const userControlsBlock = findBlock(helperBlockContent, /UserControls[\s\t]*=[\s\t]*ordered\(\)[\s\t]*{/);
         if (userControlsBlock) {
-            const controlRegex = /(AutoLabel\d+)\s*=\s*{([^}]+)}/g;
+            const controlRegex = /(AutoLabel\d+)[\s\t]*=[\s\t]*{([^}]+)}/g;
             let controlMatch;
             while ((controlMatch = controlRegex.exec(userControlsBlock.content)) !== null) {
                 const key = controlMatch[1];
                 const numCap = key.match(/AutoLabel(\d+)/);
                 if (numCap) {
-                    const n = parseInt(numCap[1], 10);
-                    if (!isNaN(n)) maxAutoLabelIndex = Math.max(maxAutoLabelIndex, n);
+                    maxAutoLabelIndex = Math.max(maxAutoLabelIndex, parseInt(numCap[1], 10));
                 }
                 const propertiesText = controlMatch[2];
-                const nameMatch = propertiesText.match(/LINKS_Name\s*=\s*"([^"]+)"/);
-                const nestLevelMatch = propertiesText.match(/LBLC_NestLevel\s*=\s*(\d+)/);
-                const numInputsMatch = propertiesText.match(/LBLC_NumInputs\s*=\s*(\d+)/);
+                const nameMatch = propertiesText.match(/LINKS_Name[\s\t]*=[\s\t]*"([^"]+)"/);
+                const nestLevelMatch = propertiesText.match(/LBLC_NestLevel[\s\t]*=[\s\t]*(\d+)/);
+                const numInputsMatch = propertiesText.match(/LBLC_NumInputs[\s\t]*=[\s\t]*(\d+)/);
 
                 if (nameMatch && nestLevelMatch && numInputsMatch) {
                     metadataMap.set(key, {
@@ -199,15 +247,11 @@ export function parseSettingFile(content) {
                 continue;
             }
             if (item.type === 'SEPARATOR_DATA') {
-                const separatorNode = {
-                    id: nextId++,
-                    type: 'SEPARATOR',
+                parent.children.push({
+                    id: nextId++, type: 'SEPARATOR',
                     data: { key: item.key, originalBlock: item.originalBlock, properties: item.properties },
-                    parent: parent,
-                    children: [],
-                    hidden: false
-                };
-                parent.children.push(separatorNode);
+                    parent: parent, children: [], hidden: false
+                });
                 continue;
             }
             if (item.type === 'CONTROL_DATA') {
@@ -215,28 +259,18 @@ export function parseSettingFile(content) {
                 if (isGroup) {
                     const metadata = metadataMap.get(item.properties.Source);
                     const groupNode = {
-                        id: nextId++,
-                        type: 'GROUP',
-                        name: metadata.name,
-                        internalKey: item.properties.Source,
-                        parent: parent,
-                        children: [],
+                        id: nextId++, type: 'GROUP', name: metadata.name,
+                        internalKey: item.properties.Source, parent: parent, children: [],
                         data: { key: item.key, originalBlock: item.originalBlock, properties: item.properties }
                     };
                     parent.children.push(groupNode);
-                    const childrenToProcess = items.splice(0, metadata.childCount);
-                    buildTreeRecursive(groupNode, childrenToProcess);
+                    buildTreeRecursive(groupNode, items.splice(0, metadata.childCount));
                 } else {
-                    const isMainInput = /^MainInput\d+$/i.test(item.key);
-                    const controlNode = {
-                        id: nextId++,
-                        type: 'CONTROL',
+                    parent.children.push({
+                        id: nextId++, type: 'CONTROL',
                         data: { key: item.key, originalBlock: item.originalBlock, properties: item.properties },
-                        parent: parent,
-                        children: [],
-                        hidden: isMainInput
-                    };
-                    parent.children.push(controlNode);
+                        parent: parent, children: [], hidden: /^MainInput\d+$/i.test(item.key)
+                    });
                 }
             }
         }
@@ -244,5 +278,32 @@ export function parseSettingFile(content) {
 
     buildTreeRecursive(root, flatList);
 
-    return { tree: root, mainOperatorName, mainOperatorType, originalTools, maxAutoLabelIndex, diagnostics };
+    return { tree: root, maxAutoLabelIndex };
+}
+
+
+/**
+ * Main parser function.
+ * @param {string} content The string content of the .setting file.
+ * @returns {{tree: object, segments: Array<object>, maxAutoLabelIndex: number, diagnostics: object}}
+ */
+export function parseSettingFile(content) {
+    // Phase 1: Split file into structural segments
+    const { segments, diagnostics } = parseFileIntoSegments(content);
+
+    // Extract the content of our target blocks
+    const inputsSegment = segments.find(s => s.type === 'inputs_block');
+    const helperSegment = segments.find(s => s.type === 'helper_block');
+    const inputsBlockContent = inputsSegment ? inputsSegment.content : '';
+    const helperBlockContent = helperSegment ? helperSegment.content : '';
+
+    // Phase 2: Build the UI tree from the extracted content
+    const { tree, maxAutoLabelIndex } = buildTreeFromContent(inputsBlockContent, helperBlockContent, diagnostics);
+
+    return {
+        tree,
+        segments,
+        maxAutoLabelIndex,
+        diagnostics
+    };
 }

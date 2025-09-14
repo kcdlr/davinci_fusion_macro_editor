@@ -97,9 +97,9 @@ export function generateSettingFile(tree, segments, originalFilename, maxAutoLab
 
                 userControlsForHelper.push(`                        ${node.internalKey} = { INP_Passive = true, INP_External = false, LBLC_DropDownButton = true, INPID_InputControl = "LabelControl", LBLC_NumInputs = ${descendantCount}, LBLC_NestLevel = 1, LINKID_DataType = "Number", LINKS_Name = "${node.name}", },`);
                 userControlInputsForHelper.push(`                        ${node.internalKey} = Input { Value = 1, },`);
-                block = `                ${node.data?.key || node.internalKey} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "${node.internalKey}"\n                }`;
+                block = `${node.data?.key || node.internalKey} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "${node.internalKey}"\n                }`;
             } else if (node.type === 'SEPARATOR') {
-                block = `                ${node.data.key || `Separator${separatorCounter++}`} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "Separator"\n                }`;
+                block = `${node.data.key || `Separator${separatorCounter++}`} = InstanceInput {\n                    SourceOp = "${HELPER_NODE_NAME}",\n                    Source = "Separator"\n                }`;
             }
 
             // Apply page property if currently inside a page
@@ -118,7 +118,7 @@ export function generateSettingFile(tree, segments, originalFilename, maxAutoLab
     generateBlocksRecursive(tree);
 
     // Assemble the new Inputs block content
-    const newInputsContent = `\n${mainInstanceInputs.join(',\n')}\n            `;
+    const newInputsContent = `\n                ${mainInstanceInputs.join(',\n                ')}\n            `;
 
     // Assemble the new helper node content
     const newHelperContent = `
@@ -137,30 +137,22 @@ ${userControlsForHelper.join('\n')}
 
     // --- Part 2: Reconstruct the final file from segments ---
 
-    let finalContent = '';
+    let rebuiltString = '';
     for (const segment of segments) {
         if (segment.type === 'inputs_block') {
             // Replace the old inputs block with the newly generated one
-            const header = segment.fullText.substring(0, segment.fullText.indexOf('{') + 1);
-            const footer = segment.fullText.match(/}(\s*,?\s*)$/)?.[0] || '},';
-            finalContent += header + newInputsContent + footer;
+            rebuiltString += `\n            Inputs = ordered() {${newInputsContent}},`;
         } else if (segment.type === 'helper_block') {
-            // If the helper block existed, replace its content. If not, insert the new one.
-            if (segment.fullText) {
-                 const header = segment.fullText.substring(0, segment.fullText.indexOf('{') + 1);
-                 const footer = segment.fullText.match(/}(\s*,?\s*)$/)?.[0] || '},';
-                 finalContent += `                ${HELPER_NODE_NAME} = Background {` + newHelperContent + footer;
-            } else {
-                // This case handles when a helper node needs to be created from scratch
-                finalContent += `                ${HELPER_NODE_NAME} = Background {${newHelperContent}},`;
-            }
+            // This case handles when a helper node needs to be created from scratch
+            rebuiltString += `\n                ${HELPER_NODE_NAME} = Background {${newHelperContent}},`;
         } else {
             // For all other parts of the file, append them as-is
-            finalContent += segment.content;
+            rebuiltString += segment.string;
         }
     }
 
-
+    const formattedString  = rebuiltString.replace(/ {4}/g, '\t');
     const newFilename = (originalFilename || 'macro.setting').replace('.setting', '_modified.setting');
-    return { content: finalContent, filename: newFilename };
+
+    return { string: formattedString , filename: newFilename };
 }

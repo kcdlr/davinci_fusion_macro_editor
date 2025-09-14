@@ -42,12 +42,16 @@ function addClickFeedback(button) {
     }, 200); // Remove the class after 200ms
 }
 
-function processInputContent(content, filename = 'clipboard_macro.setting') {
+function processInputContent(text, filename = 'clipboard_macro.setting') {
     try {
         originalFilename = filename;
-        const result = parseSettingFile(content);
+        if (!text || text.trim() === '') {
+            throw new Error("入力が空です。");
+        }
 
-        if (content.trim() !== '' && (!result || !result.tree || !result.segments || result.tree.children.length === 0)) {
+        const result = parseSettingFile(text);
+
+        if (!result || !result.tree || !result.segments || result.tree.children.length === 0) {
             const error = new Error("ファイルの解析に失敗しました。対応していない形式か、ファイルが破損している可能性があります。");
             error.diagnostics = result.diagnostics;
             throw error;
@@ -465,8 +469,8 @@ ui.outdentBtn.addEventListener('click', () => {
 ui.outputBtn.addEventListener('click', () => {
     addClickFeedback(ui.outputBtn);
     try {
-        const { content } = generateSettingFile(tree, segments, originalFilename, maxAutoLabelIndex);
-        ui.outputText.value = content;
+        const { string } = generateSettingFile(tree, segments, originalFilename, maxAutoLabelIndex);
+        ui.outputText.value = string;
     } catch (error) {
         alert(`Error generating output: ${error.message}`);
         console.error('Error during output generation:', error);
@@ -484,8 +488,8 @@ ui.copyOutputBtn.addEventListener('click', () => {
 ui.downloadOutputBtn.addEventListener('click', () => {
     addClickFeedback(ui.downloadOutputBtn);
     try {
-        const { content, filename } = generateSettingFile(tree, segments, originalFilename, maxAutoLabelIndex);
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const { string, filename } = generateSettingFile(tree, segments, originalFilename, maxAutoLabelIndex);
+        const blob = new Blob([string], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = filename;

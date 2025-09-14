@@ -73,7 +73,6 @@ function parseFileIntoSegments(fileContent) {
                 startIndex: groupBodyOffset + inputsResult.startIndex,
                 endIndex: groupBodyOffset + inputsResult.endIndex,
                 content: inputsResult.content,
-                fullText: inputsResult.fullText
             });
         }
 
@@ -91,7 +90,6 @@ function parseFileIntoSegments(fileContent) {
                     startIndex: groupBodyOffset + toolsBodyOffset + helperResult.startIndex,
                     endIndex: groupBodyOffset + toolsBodyOffset + helperResult.endIndex,
                     content: helperResult.content,
-                    fullText: helperResult.fullText
                 });
             } else {
                 const firstNewlineInTools = toolsBody.indexOf('\n');
@@ -102,7 +100,6 @@ function parseFileIntoSegments(fileContent) {
                     startIndex: insertionIndex,
                     endIndex: insertionIndex,
                     content: '',
-                    fullText: ''
                 });
             }
         }
@@ -113,13 +110,13 @@ function parseFileIntoSegments(fileContent) {
     let currentIndex = 0;
     for (const block of foundBlocks) {
         if (block.startIndex > currentIndex) {
-            segments.push({ type: 'string', content: fileContent.substring(currentIndex, block.startIndex) });
+            segments.push({ type: 'string', string: fileContent.substring(currentIndex, block.startIndex) });
         }
-        segments.push({ type: block.type, content: block.content, fullText: block.fullText });
+        segments.push({ type: block.type, content: block.content });
         currentIndex = block.endIndex;
     }
     if (currentIndex < fileContent.length) {
-        segments.push({ type: 'string', content: fileContent.substring(currentIndex) });
+        segments.push({ type: 'string', string: fileContent.substring(currentIndex) });
     }
 
     return { segments, diagnostics };
